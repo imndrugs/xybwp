@@ -43,7 +43,7 @@ export default async function handler(conn, m, args, db) {
       quotedMsg?.stickerMessage
 
     if (!media) {
-      return conn.sendMessage(jid, { text: 'Responde a una imagen o video con .sticker' }, { quoted: m })
+      return conn.sendMessage(jid, { text: '🖼️ Responde a una imagen o video con .sticker' }, { quoted: m })
     }
 
     const buffer = await downloadMediaMessage(mediaMessage, conn, {})
@@ -55,6 +55,6 @@ export default async function handler(conn, m, args, db) {
     }, { quoted: m })
   } catch (error) {
     console.error(error)
-    await conn.sendMessage(jid, { text: 'No pude crear el sticker' }, { quoted: m })
+    await conn.sendMessage(jid, { text: '❌ No pude crear el sticker' }, { quoted: m })
   }
 }

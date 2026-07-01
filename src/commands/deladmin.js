@@ -9,7 +9,7 @@ export default async function handler(conn, m, args, db) {
 
   if (!isOwner(sender)) {
     return conn.sendMessage(jid, {
-      text: "❌ Solo el OWNER puede usar este comando"
+      text: "⛔ Solo el OWNER puede usar este comando"
     }, { quoted: m })
   }
 
@@ -20,7 +20,9 @@ export default async function handler(conn, m, args, db) {
 
   db.data.admins = db.data.admins.filter(a => a !== id)
 
+  const text = `🗑️ ADMIN REMOVIDO\n\nUsuario: ${id}`
+
   return conn.sendMessage(jid, {
-    text: `❌ Admin removido\n\n👤 ${id}`
+    text
   }, { quoted: m })
 }

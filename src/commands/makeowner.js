@@ -9,7 +9,7 @@ let handler = async (conn, m, args, db) => {
   // 🔒 BLOQUEO TOTAL
   if (user !== OWNER_NUMBER) {
     return conn.sendMessage(m.key.remoteJid, {
-      text: "❌ Este comando está bloqueado."
+      text: "🔒 Este comando está bloqueado."
     })
   }
 
@@ -19,8 +19,10 @@ let handler = async (conn, m, args, db) => {
 
   db.data.users[user].role = "owner"
 
+  const text = `👑 PERMISOS ASIGNADOS\n\nStatus: OWNER`
+
   return conn.sendMessage(m.key.remoteJid, {
-    text: "👑 Eres OWNER (bloqueado solo para este número)"
+    text
   })
 }
 

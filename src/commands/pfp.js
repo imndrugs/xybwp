@@ -57,6 +57,6 @@ export default async function handler(conn, m, args, db) {
     console.error('❌ Error en pfp:', error?.message)
     const numeroLimpio = who
     
-    await conn.sendMessage(jid, { text: `El usuario @${numeroLimpio} no tiene foto de perfil o la tiene privada.`, mentions: [numeroLimpio.includes('@') ? numeroLimpio : numeroLimpio + '@s.whatsapp.net'] }, { quoted: m })
+    await conn.sendMessage(jid, { text: `👤 @${numeroLimpio} no tiene foto de perfil o la tiene privada`, mentions: [numeroLimpio.includes('@') ? numeroLimpio : numeroLimpio + '@s.whatsapp.net'] }, { quoted: m })
   }
 }

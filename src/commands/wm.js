@@ -31,13 +31,13 @@ export default async function handler(conn, m, args, db) {
     const mime = targetMsg.imageMessage?.mimetype || targetMsg.videoMessage?.mimetype || targetMsg.stickerMessage?.mimetype || ''
 
     if (!mime || !/webp|image|video/g.test(mime)) {
-      return conn.sendMessage(jid, { text: 'Responde a una imagen, video o sticker con .wm' }, { quoted: m })
+      return conn.sendMessage(jid, { text: '🖼️ Responde a una imagen, video o sticker con .wm' }, { quoted: m })
     }
 
     if (/video/g.test(mime)) {
       const duration = targetMsg.videoMessage?.seconds || 0
       if (duration > 8) {
-        return conn.sendMessage(jid, { text: '❌ ¡El video no puede durar más de 8 segundos!' }, { quoted: m })
+        return conn.sendMessage(jid, { text: '⏱️ El video no puede durar más de 8 segundos' }, { quoted: m })
       }
     }
 

@@ -3,20 +3,14 @@ export default async function handler(conn, m, args, db) {
   const groupMetadata = await conn.groupMetadata(jid).catch(() => null)
 
   if (!groupMetadata) {
-    return conn.sendMessage(jid, { text: '❌ Este comando solo funciona en grupos' }, { quoted: m })
+    return conn.sendMessage(jid, { text: '⚠️ Este comando solo funciona en grupos' }, { quoted: m })
   }
 
   try {
     const link = 'https://chat.whatsapp.com/' + await conn.groupInviteCode(jid)
     const totalMembers = groupMetadata.participants.length
 
-    const message = `⚡🌩️──『 BOT 』──🌩️⚡
-
-📛 *Grupo:* ${groupMetadata.subject}
-👥 *Miembros:* ${totalMembers}
-
-🔗 *Enlace del grupo:* 
-${link}`
+    const message = `🔗 ENLACE DEL GRUPO\n\n👥 ${groupMetadata.subject}\n👤 ${totalMembers} miembros\n\n${link}`
 
     await conn.sendMessage(jid, { text: message }, { quoted: m, detectLink: true })
   } catch (error) {

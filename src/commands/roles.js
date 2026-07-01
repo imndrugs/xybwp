@@ -22,10 +22,7 @@ export default async function handler(conn, m, args, db) {
   const ownerNumber = formatPhone(OWNER_IDS[0] || "")
   const adminList = admins.map((admin) => formatPhone(admin)).filter(Boolean)
 
-  let text = `📊 ROLES\n\n`
-  text += `👑 OWNER:\n- ${ownerNumber || "sin configurar"}\n\n`
-  text += `🛡️ ADMINS:\n`
-  text += adminList.length ? adminList.join("\n") : "- ninguno"
+  let text = `👑 ROLES\n\n👤 OWNER\n${ownerNumber || "sin configurar"}\n\n🛡️ ADMINISTRADORES\n${adminList.length ? adminList.join("\n") : "Ninguno"}`
 
   return conn.sendMessage(jid, { text }, { quoted: m })
 }

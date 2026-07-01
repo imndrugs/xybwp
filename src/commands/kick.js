@@ -1,0 +1,62 @@
+export default async function handler(conn, m, args, db) {
+  const jid = m.chat || m.key?.remoteJid || ''
+
+  const groupMetadata = await conn.groupMetadata(jid).catch(() => null)
+  if (!groupMetadata) {
+    return conn.sendMessage(jid, {
+      text: '⚠️ Este comando solo funciona en grupos'
+    }, { quoted: m })
+  }
+
+  const botJid = conn.user?.jid || conn.user?.id || ''
+  const ctx = m.message?.extendedTextMessage?.contextInfo
+  const ownerGroup = groupMetadata.owner || jid.split('-')[0] + '@s.whatsapp.net'
+
+  let usersToKick = []
+
+  if (ctx?.mentionedJid?.length) {
+    usersToKick.push(...ctx.mentionedJid)
+  }
+
+  if (ctx?.participant && !usersToKick.includes(ctx.participant)) {
+    usersToKick.push(ctx.participant)
+  }
+
+  if (!usersToKick.length) {
+    return conn.sendMessage(jid, {
+      text: '⚠️ Menciona a alguien o responde a un mensaje'
+    }, { quoted: m })
+  }
+
+  let kicked = []
+  let errors = []
+
+  for (let user of usersToKick) {
+    if (user === botJid) {
+      errors.push('🤖 No puedo eliminarme a mí mismo')
+      continue
+    }
+    if (user === ownerGroup) {
+      errors.push('👑 No puedo sacar al dueño del grupo')
+      continue
+    }
+
+    try {
+      await conn.groupParticipantsUpdate(jid, [user], 'remove')
+      kicked.push(user)
+    } catch (e) {
+      errors.push(`⚠️ @${user.split('@')[0]}`)
+    }
+  }
+
+  let text = ''
+  if (kicked.length) {
+    text += `👢 Expulsados:\n` + kicked.map(u => `@${u.split('@')[0]}`).join('\n')
+  }
+  if (errors.length) {
+    if (text) text += '\n\n'
+    text += `❌ No expulsados:\n` + errors.join('\n')
+  }
+
+  await conn.sendMessage(jid, { text }, { quoted: m })
+}

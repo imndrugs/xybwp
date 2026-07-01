@@ -13,7 +13,7 @@ export default async function handler(conn, m, args, db) {
   // 🔥 OWNER CHECK
   if (!isOwner(sender)) {
     return conn.sendMessage(jid, {
-      text: "❌ Solo el OWNER puede dar admins"
+      text: "⛔ Solo el OWNER puede dar admins"
     }, { quoted: m })
   }
 
@@ -40,7 +40,9 @@ export default async function handler(conn, m, args, db) {
     db.data.admins.push(id)
   }
 
+  const text = `✅ ADMIN AGREGADO\n\nUsuario: ${id}`
+
   return conn.sendMessage(jid, {
-    text: `🛡️ ADMIN agregado\n\n👤 ${id}`
+    text
   }, { quoted: m })
 }

@@ -7,7 +7,7 @@ let handler = async (conn, m, args, db) => {
   // SOLO owner y admin
   if (!canUse(user, ["owner", "admin"], db)) {
     return conn.sendMessage(m.key.remoteJid, {
-      text: "❌ No tienes permisos para usar este comando."
+      text: "⛔ No tienes permisos para usar este comando."
     })
   }
 
@@ -24,7 +24,7 @@ let handler = async (conn, m, args, db) => {
 
   if (!targets.length) {
     return conn.sendMessage(m.key.remoteJid, {
-      text: "❌ No hay usuarios para eliminar."
+      text: "⚠️ No hay usuarios para eliminar."
     })
   }
 

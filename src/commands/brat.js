@@ -26,7 +26,7 @@ export default async function handler(conn, m, args, db) {
   const sender = getSenderId(m)
 
   if (!args[0]) {
-    return conn.sendMessage(jid, { text: '❌ Uso: .brat <texto>\n\nEjemplo: .brat hola' }, { quoted: m })
+    return conn.sendMessage(jid, { text: '✏️ Uso: .brat <texto>\n\nEjemplo: .brat hola' }, { quoted: m })
   }
 
   try {
@@ -44,6 +44,6 @@ export default async function handler(conn, m, args, db) {
     }
   } catch (error) {
     console.error(error)
-    await conn.sendMessage(jid, { text: `❌ Error: ${error.message}` }, { quoted: m })
+    await conn.sendMessage(jid, { text: `Error: ${error.message}` }, { quoted: m })
   }
 }
