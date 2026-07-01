@@ -1,10 +1,13 @@
 export default async function handler(conn, m) {
 
+    const start = Date.now()
+
     const jid = m?.key?.remoteJid || m.chat || m.sender
     if (!jid) return
 
-    return await conn.sendMessage(jid, {
-        text: "Mi creador es EzMe, contactalo como @imndrugs en telegram"
+    // mensaje único
+    const sent = await conn.sendMessage(jid, {
+        text: "Mi Creador es EzMe, encuentralo en telegram como imndrugs"
     }, { quoted: m })
 
 }
