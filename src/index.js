@@ -10,6 +10,9 @@ import makeWASocket, {
 
 import P from 'pino'
 import qrcode from 'qrcode-terminal'
+import dotenv from 'dotenv'
+
+dotenv.config()
 
 async function startBot() {
 
