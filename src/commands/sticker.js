@@ -50,11 +50,15 @@ export default async function handler(conn, m, args, db) {
       return conn.sendMessage(jid, { text: '🖼️ Responde a una imagen, video o GIF con .sticker' }, { quoted: m })
     }
 
-    const buffer = await downloadMediaMessage(mediaMessage, conn, {})
+    const buffer = await downloadMediaMessage(mediaMessage, 'buffer', {})
 
     const isVideo = !!message.videoMessage || !!quotedMsg?.videoMessage || media?.mimetype?.startsWith('video/') || false
 
     if (isVideo) {
+      const duration = (message.videoMessage?.seconds || quotedMsg?.videoMessage?.seconds || 0)
+      if (duration > 10) {
+        return conn.sendMessage(jid, { text: '🎬 El video no puede durar más de 10 segundos' }, { quoted: m })
+      }
       const tmpInput = join(tmpdir(), `${Date.now()}.mp4`)
       const tmpOutput = join(tmpdir(), `${Date.now()}.webp`)
       try {
