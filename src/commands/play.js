@@ -1,5 +1,5 @@
 import yts from 'yt-search'
-import { execFile, execSync } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -9,7 +9,6 @@ const execFileAsync = promisify(execFile)
 const YT_DLP = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
 const TEMP_DIR = join(tmpdir(), 'bot_play')
 const YT_COOKIE_PATH = 'src/youtube_cookies.txt'
-const DENO_PATH = '/usr/local/bin/deno'
 
 if (!existsSync(TEMP_DIR)) mkdirSync(TEMP_DIR, { recursive: true })
 
@@ -57,107 +56,76 @@ async function tryOceansaver(url) {
   return null
 }
 
-function hasDeno() {
-  try {
-    execSync(`${DENO_PATH} --version`, { stdio: 'pipe' })
-    return true
-  } catch {
-    return false
-  }
-}
-
 async function downloadAudio(url) {
   const ts = Date.now()
-  const denoAvailable = hasDeno()
-
-  // Strategy 1: Android client (no cookies, no JS runtime needed)
-  if (!denoAvailable) {
-    const out1 = join(TEMP_DIR, `play_${ts}.%(ext)s`)
-    try {
-      await execFileAsync(YT_DLP, [
-        '--no-playlist',
-        '--extractor-args', 'youtube:player_client=android',
-        '-f', 'bestaudio[ext=m4a]/bestaudio',
-        '--extract-audio', '--audio-format', 'mp3',
-        '-o', out1, url
-      ], { timeout: 120000 })
-      const file = join(TEMP_DIR, `play_${ts}.mp3`)
-      if (existsSync(file)) return file
-    } catch {}
-  }
-
-  // Strategy 2: Web client with cookies + deno (if available)
   const hasCookies = existsSync(YT_COOKIE_PATH)
-  if (denoAvailable && hasCookies) {
+
+  // Strategy 1: Android client — no cookies needed, no JS runtime needed
+  const out1 = join(TEMP_DIR, `play_${ts}.%(ext)s`)
+  try {
+    const args = [
+      '--no-playlist',
+      '--extractor-args', 'youtube:player_client=android',
+      '-f', 'bestaudio/best',
+      '--extract-audio', '--audio-format', 'mp3',
+      '-o', out1, url
+    ]
+    await execFileAsync(YT_DLP, args, { timeout: 120000 })
+    const file = join(TEMP_DIR, `play_${ts}.mp3`)
+    if (existsSync(file) && readFileSync(file).length > 1000) return file
+  } catch {}
+
+  // Strategy 2: Cookies + default client (might warn about JS but try anyway)
+  if (hasCookies) {
     const out2 = join(TEMP_DIR, `play_${ts}_c.%(ext)s`)
     try {
-      const args = [
-        '--no-playlist',
-        '--js-runtimes', `deno:${DENO_PATH}`,
-        '--cookies', YT_COOKIE_PATH,
-        '-f', 'bestaudio[ext=m4a]/bestaudio/bestaudio',
-        '--extract-audio', '--audio-format', 'mp3',
-        '-o', out2, url
-      ]
-      await execFileAsync(YT_DLP, args, { timeout: 120000 })
-      const file = join(TEMP_DIR, `play_${ts}_c.mp3`)
-      if (existsSync(file)) return file
-    } catch {}
-  }
-
-  // Strategy 3: Web client with deno (no cookies)
-  if (denoAvailable) {
-    const out3 = join(TEMP_DIR, `play_${ts}_n.%(ext)s`)
-    try {
       await execFileAsync(YT_DLP, [
         '--no-playlist',
-        '--js-runtimes', `deno:${DENO_PATH}`,
-        '-f', 'bestaudio[ext=m4a]/bestaudio/bestaudio',
+        '--cookies', YT_COOKIE_PATH,
+        '-f', 'bestaudio/best',
         '--extract-audio', '--audio-format', 'mp3',
-        '-o', out3, url
+        '-o', out2, url
       ], { timeout: 120000 })
-      const file = join(TEMP_DIR, `play_${ts}_n.mp3`)
-      if (existsSync(file)) return file
+      const file = join(TEMP_DIR, `play_${ts}_c.mp3`)
+      if (existsSync(file) && readFileSync(file).length > 1000) return file
     } catch {}
   }
 
-  throw new Error('No se pudo descargar el audio con ningún método')
+  throw new Error('No se pudo descargar. YouTube está bloqueando el servidor. Usa .ytcookies para configurar cookies')
 }
 
 async function downloadVideo(url) {
   const ts = Date.now()
-  const denoAvailable = hasDeno()
   const hasCookies = existsSync(YT_COOKIE_PATH)
 
-  // Try with android first
+  // Strategy 1: Android
   const out1 = join(TEMP_DIR, `play_v_${ts}.%(ext)s`)
   try {
     await execFileAsync(YT_DLP, [
       '--no-playlist',
       '--extractor-args', 'youtube:player_client=android',
-      '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
+      '-f', 'best[ext=mp4]/best',
       '--merge-output-format', 'mp4',
       '-o', out1, url
     ], { timeout: 180000 })
     const file = join(TEMP_DIR, `play_v_${ts}.mp4`)
-    if (existsSync(file)) return file
+    if (existsSync(file) && readFileSync(file).length > 1000) return file
   } catch {}
 
-  // Try with deno + cookies
-  if (denoAvailable) {
+  // Strategy 2: Cookies
+  if (hasCookies) {
     const out2 = join(TEMP_DIR, `play_v_${ts}_c.%(ext)s`)
     try {
       const args = [
         '--no-playlist',
-        '--js-runtimes', `deno:${DENO_PATH}`,
-        '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
+        '-f', 'best[ext=mp4]/best',
         '--merge-output-format', 'mp4',
         '-o', out2, url
       ]
       if (hasCookies) args.push('--cookies', YT_COOKIE_PATH)
       await execFileAsync(YT_DLP, args, { timeout: 180000 })
       const file = join(TEMP_DIR, `play_v_${ts}_c.mp4`)
-      if (existsSync(file)) return file
+      if (existsSync(file) && readFileSync(file).length > 1000) return file
     } catch {}
   }
 
@@ -195,7 +163,7 @@ export default async function handler(conn, m, args, db) {
         await conn.sendMessage(jid, { video: buf, caption: `🎬 ${video.title}` }, { quoted: m })
         try { unlinkSync(filePath) } catch {}
       } catch (e) {
-        await conn.sendMessage(jid, { text: `❌ Error video: ${e.message}` }, { quoted: m })
+        await conn.sendMessage(jid, { text: `❌ ${e.message}` }, { quoted: m })
       }
       return
     }
@@ -214,8 +182,9 @@ export default async function handler(conn, m, args, db) {
           fileName: `${video.title}.mp3`
         }, { quoted: m })
         sent = true
-        console.log('Audio via oceansaver')
-      } catch {}
+      } catch (e) {
+        console.log('Oceansaver send error:', e.message)
+      }
     }
 
     // Fallback to yt-dlp
@@ -232,6 +201,6 @@ export default async function handler(conn, m, args, db) {
     }
   } catch (e) {
     console.error(e)
-    await conn.sendMessage(jid, { text: `❌ Error: ${e.message}\n\n📌 Configura cookies: exporta cookies.txt de youtube.com y responde con .ytcookies` }, { quoted: m })
+    await conn.sendMessage(jid, { text: `❌ ${e.message}` }, { quoted: m })
   }
 }
