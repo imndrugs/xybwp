@@ -14,6 +14,8 @@ export default async function handler(conn, m, args, db) {
 
   const sub = args[0].toLowerCase()
 
+  const groupKey = jid.endsWith('@g.us') ? jid : 'global'
+
   if (sub === 'add') {
     const full = args.slice(1).join(' ')
     const match = full.match(/"([^"]+)"\s*"([^"]+)"/)
@@ -25,13 +27,15 @@ export default async function handler(conn, m, args, db) {
     const trigger = match[1].toLowerCase()
     const response = match[2]
     if (!db.data.autoresponder) db.data.autoresponder = {}
-    db.data.autoresponder[trigger] = response
+    if (!db.data.autoresponder[groupKey]) db.data.autoresponder[groupKey] = {}
+    db.data.autoresponder[groupKey][trigger] = response
     const dataFile = path.join(process.cwd(), 'database.json')
     try {
       const raw = JSON.parse(fs.readFileSync(dataFile, 'utf8') || '{}')
       if (!raw.data) raw.data = {}
       if (!raw.data.autoresponder) raw.data.autoresponder = {}
-      raw.data.autoresponder[trigger] = response
+      if (!raw.data.autoresponder[groupKey]) raw.data.autoresponder[groupKey] = {}
+      raw.data.autoresponder[groupKey][trigger] = response
       fs.writeFileSync(dataFile, JSON.stringify(raw, null, 2))
     } catch {}
     return conn.sendMessage(jid, {
@@ -48,17 +52,17 @@ export default async function handler(conn, m, args, db) {
       }, { quoted: m })
     }
     const trigger = match[1].toLowerCase()
-    if (!db.data.autoresponder?.[trigger]) {
+    if (!db.data.autoresponder?.[groupKey]?.[trigger]) {
       return conn.sendMessage(jid, {
         text: `❌ No existe la auto-respuesta para "${trigger}"`
       }, { quoted: m })
     }
-    delete db.data.autoresponder[trigger]
+    delete db.data.autoresponder[groupKey][trigger]
     const dataFile = path.join(process.cwd(), 'database.json')
     try {
       const raw = JSON.parse(fs.readFileSync(dataFile, 'utf8') || '{}')
-      if (raw.data?.autoresponder?.[trigger]) {
-        delete raw.data.autoresponder[trigger]
+      if (raw.data?.autoresponder?.[groupKey]?.[trigger]) {
+        delete raw.data.autoresponder[groupKey][trigger]
         fs.writeFileSync(dataFile, JSON.stringify(raw, null, 2))
       }
     } catch {}
@@ -69,13 +73,16 @@ export default async function handler(conn, m, args, db) {
 
   if (sub === 'list') {
     const autoresponder = db.data?.autoresponder || {}
-    const keys = Object.keys(autoresponder)
+    const globalAr = autoresponder['global'] || {}
+    const groupAr = autoresponder[groupKey] || {}
+    const entries = { ...globalAr, ...groupAr }
+    const keys = Object.keys(entries)
     if (!keys.length) {
       return conn.sendMessage(jid, {
         text: '📝 No hay auto-respuestas configuradas.'
       }, { quoted: m })
     }
-    const list = keys.map(k => `"${k}" → "${autoresponder[k]}"`).join('\n')
+    const list = keys.map(k => `"${k}" → "${entries[k]}"`).join('\n')
     return conn.sendMessage(jid, {
       text: `📝 *AUTO-RESPUESTAS*\n\n${list}`
     }, { quoted: m })

@@ -193,6 +193,15 @@ async function startBot() {
     processedIds.add(msgId)
     if (processedIds.size > 1000) processedIds.clear()
 
+    // --- SAVE PHOTOS FOR .VER ---
+    if (m.message?.imageMessage) {
+      if (!global._savedPhotos) global._savedPhotos = new Map()
+      const chat = getChat(m)
+      conn.downloadMediaMessage(m).then(buf => {
+        global._savedPhotos.set(m.key.id, { buffer: buf, chat, sender: m.key.participant })
+      }).catch(() => {})
+    }
+
     // --- NOTIFICAR CAMBIOS DE ADMIN ---
     if (m.messageStubType === 29 || m.messageStubType === 30) {
       const id = m.key.remoteJid
