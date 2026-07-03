@@ -2,3 +2,5 @@ sessions/
 contacts.json
 node_modules/
 .env
+temp/
+src/instagram_cookies.txt

@@ -1,85 +1,117 @@
 ﻿import fetch from 'node-fetch'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+import path from 'path'
+import fs from 'fs'
 
-async function tryInstasave(url) {
-  const res = await fetch("https://instasave.io/api/v1/convert", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url })
-  })
-  const json = await res.json()
-  return json?.video || json?.image || json?.media?.[0]?.url || json?.url || json?.download_url || null
+const execFileAsync = promisify(execFile)
+const COOKIE_PATH = 'src/instagram_cookies.txt'
+const TEMP_DIR = 'temp'
+const YT_DLP = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
+
+if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true })
+
+function cleanUrl(raw) {
+  return raw.replace(/\?.*/, '').replace(/\/$/, '')
 }
 
-async function tryRapid(url) {
-  const key = process.env.RAPIDAPI_KEY || "07f782a02dmshfe7cb2bc7497fbdp1ed662jsn34aaf6a6a338"
-  const res = await fetch("https://instagram-downloader-download-instagram-videos-stories.p.rapidapi.com/index", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-rapidapi-key": key,
-      "x-rapidapi-host": "instagram-downloader-download-instagram-videos-stories.p.rapidapi.com"
-    },
-    body: JSON.stringify({ url })
-  })
-  const json = await res.json()
-  return json?.media || json?.video || json?.image || json?.url || json?.download_url || null
-}
+async function tryYtDlp(url) {
+  if (!fs.existsSync(COOKIE_PATH)) return null
+  const info = await execFileAsync(YT_DLP, [
+    '--cookies', COOKIE_PATH,
+    '--dump-json',
+    cleanUrl(url)
+  ], { timeout: 30000 })
+  const data = JSON.parse(info.stdout)
+  const isVideo = data.formats && data.formats.some(f => f.vcodec && f.vcodec !== 'none')
+  const outputPath = path.join(TEMP_DIR, `ig_${data.id}.%(ext)s`)
 
-async function tryScrape(url) {
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } })
-  const html = await res.text()
-  const patterns = [
-    /"video_url":"([^"]+)"/,
-    /property="og:video"[^>]+content="([^"]+)"/,
-    /"display_url":"([^"]+)"/,
-    /"download_url":"([^"]+)"/
-  ]
-  for (const p of patterns) {
-    const m = html.match(p)
-    if (m) return m[1].replace(/\\u0026/g, "&")
+  if (isVideo) {
+    await execFileAsync(YT_DLP, [
+      '--cookies', COOKIE_PATH,
+      '-f', 'bestvideo+bestaudio',
+      '--merge-output-format', 'mp4',
+      '-o', outputPath,
+      cleanUrl(url)
+    ], { timeout: 120000 })
+    const filePath = path.join(TEMP_DIR, `ig_${data.id}.mp4`)
+    return { type: 'video', path: filePath }
   }
-  return null
+
+  const imgUrl = data.thumbnail
+  const ext = path.extname(new URL(imgUrl).pathname) || '.jpg'
+  const filePath = path.join(TEMP_DIR, `ig_${data.id}${ext}`)
+  const resp = await fetch(imgUrl)
+  const buf = Buffer.from(await resp.arrayBuffer())
+  fs.writeFileSync(filePath, buf)
+  return { type: 'image', path: filePath }
+}
+
+async function trySocialKit(url) {
+  const key = process.env.SOCIALKIT_KEY
+  if (!key) return null
+  try {
+    const res = await fetch("https://api.socialkit.dev/instagram/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ access_key: key, url, format: "mp4", quality: "720p" })
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    const downloadUrl = json?.data?.downloadUrl
+    if (!downloadUrl) return null
+    const fileResp = await fetch(downloadUrl)
+    const buf = Buffer.from(await fileResp.arrayBuffer())
+    const filePath = path.join(TEMP_DIR, `ig_socialkit_${Date.now()}.mp4`)
+    fs.writeFileSync(filePath, buf)
+    return { type: 'video', path: filePath }
+  } catch {
+    return null
+  }
 }
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ""
-  const url = args[0]
+  const raw = args[0]
 
-  if (!url) {
+  if (!raw) {
     return conn.sendMessage(jid, {
-      text: "📌 Envía un link de Instagram (reel, post, historia)"
+      text: "🔗 Envía un link de Instagram (reel, post, foto)"
     }, { quoted: m })
   }
 
   await conn.sendMessage(jid, {
-    text: "⏬ Descargando contenido de Instagram..."
+    text: "⏬ Descargando..."
   }, { quoted: m })
 
-  const apis = [tryScrape, tryInstasave, tryRapid]
+  const apis = [tryYtDlp, trySocialKit]
   for (const api of apis) {
     try {
-      const mediaUrl = await api(url)
-      if (mediaUrl) {
-        const isVideo = mediaUrl.match(/\.(mp4|mov|avi|webm)($|\?)/i)
-        if (isVideo) {
+      const result = await api(raw)
+      if (result) {
+        const caption = result.type === 'video'
+          ? "📥 Instagram reel descargado"
+          : "📥 Instagram descargado"
+        if (result.type === 'video') {
           await conn.sendMessage(jid, {
-            video: { url: mediaUrl },
-            caption: "📥 Instagram reel descargado"
+            video: fs.readFileSync(result.path),
+            caption
           }, { quoted: m })
         } else {
           await conn.sendMessage(jid, {
-            image: { url: mediaUrl },
-            caption: "📥 Instagram descargado"
+            image: fs.readFileSync(result.path),
+            caption
           }, { quoted: m })
         }
+        try { fs.unlinkSync(result.path) } catch {}
         return
       }
     } catch (e) {
-      console.log("IG API falló:", e.message)
+      console.log("IG falló:", e.message)
     }
   }
 
   return conn.sendMessage(jid, {
-    text: "❌ No se pudo descargar el contenido de Instagram. Verifica que el link sea válido."
+    text: "❌ No se pudo descargar. Verifica que el link sea válido."
   }, { quoted: m })
 }
