@@ -42,13 +42,20 @@ const DOWNLOAD_APIS = [
     const key = process.env.SOCIALKIT_KEY
     if (!key) return null
     try {
-      const r = await fetch(`https://api.socialkit.dev/youtube/download?access_key=${key}&url=https://youtube.com/watch?v=${videoId}&format=mp3`, {
-        signal: AbortSignal.timeout(20000)
+      const r = await fetch('https://api.socialkit.dev/youtube/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          access_key: key,
+          url: `https://youtube.com/watch?v=${videoId}`,
+          format: 'mp3'
+        }),
+        signal: AbortSignal.timeout(30000)
       })
       if (!r.ok) return null
       const d = await r.json()
-      return d?.data?.downloadUrl || d?.download_url || d?.downloadUrl || null
-    } catch { return null }
+      return d?.data?.downloadUrl || null
+    } catch (e) { console.log('SocialKit error:', e.message); return null }
   },
 
   // Oceansaver
