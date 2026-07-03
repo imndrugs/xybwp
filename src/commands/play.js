@@ -35,89 +35,86 @@ async function searchYT(query) {
   return result.videos?.[0] || null
 }
 
-function jsRuntimeArgs() {
-  // Use node as JS runtime (already installed)
-  return ['--js-runtimes', `node:${process.execPath}`]
-}
-
+// -- OCEANSAVER API (downloads on their servers, bypasses IP blocks) --
 async function tryOceansaver(url) {
   try {
     const initResp = await fetch(
       `https://p.oceansaver.in/ajax/download.php?format=mp3&url=${encodeURIComponent(url)}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) }
+      { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000) }
     )
-    const initData = await initResp.json()
-    if (!initData?.success) return null
+    const text = await initResp.text()
+    let data
+    try { data = JSON.parse(text) } catch { return null }
+    if (!data?.success || !data?.id) return null
 
-    for (let i = 0; i < 20; i++) {
-      const progResp = await fetch(`https://p.oceansaver.in/ajax/progress.php?id=${initData.id}`,
+    for (let i = 0; i < 30; i++) {
+      const pResp = await fetch(`https://p.oceansaver.in/ajax/progress.php?id=${data.id}`,
         { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) }
       )
-      const progData = await progResp.json()
-      if (progData?.success && progData.progress === 1000) return progData.download_url
-      await new Promise(r => setTimeout(r, 3000))
+      const pData = await pResp.json()
+      if (pData?.success && pData.progress === 1000) return pData.download_url
+      await new Promise(r => setTimeout(r, 2000))
     }
-  } catch {}
+  } catch (e) { console.log('Oceansaver error:', e.message) }
   return null
 }
 
+// -- YT-DLP (fallback, YouTube may block Railway IP) --
 async function downloadAudio(url) {
   const ts = Date.now()
   const hasCookies = existsSync(YT_COOKIE_PATH)
-  const baseArgs = ['--no-playlist', ...jsRuntimeArgs(), '-f', 'bestaudio/best', '--extract-audio', '--audio-format', 'mp3']
+  const baseArgs = ['--no-playlist', '-f', 'bestaudio/best', '--extract-audio', '--audio-format', 'mp3']
 
-  // Strategy 1: node JS runtime + cookies (if available)
+  // Try with node JS runtime + cookies
   if (hasCookies) {
-    const out = join(TEMP_DIR, `play_${ts}_c.%(ext)s`)
     try {
-      await execFileAsync(YT_DLP, [...baseArgs, '--cookies', YT_COOKIE_PATH, '-o', out, url], { timeout: 120000 })
+      const out = join(TEMP_DIR, `play_${ts}_c.%(ext)s`)
+      await execFileAsync(YT_DLP, [
+        ...baseArgs, '--js-runtimes', `node:${process.execPath}`, '--cookies', YT_COOKIE_PATH, '-o', out, url
+      ], { timeout: 120000 })
       const file = join(TEMP_DIR, `play_${ts}_c.mp3`)
       if (existsSync(file) && readFileSync(file).length > 1000) return file
-    } catch (e) { console.log('YT strategy 1 failed:', e.message) }
+    } catch {}
   }
 
-  // Strategy 2: node JS runtime without cookies
-  const out = join(TEMP_DIR, `play_${ts}.%(ext)s`)
+  // Try android client (no JS runtime)
   try {
-    await execFileAsync(YT_DLP, [...baseArgs, '-o', out, url], { timeout: 120000 })
-    const file = join(TEMP_DIR, `play_${ts}.mp3`)
-    if (existsSync(file) && readFileSync(file).length > 1000) return file
-  } catch (e) { console.log('YT strategy 2 failed:', e.message) }
-
-  // Strategy 3: android client (no JS runtime needed)
-  try {
-    const out3 = join(TEMP_DIR, `play_${ts}_a.%(ext)s`)
+    const out = join(TEMP_DIR, `play_${ts}_a.%(ext)s`)
     await execFileAsync(YT_DLP, [
-      '--no-playlist',
-      '--extractor-args', 'youtube:player_client=android',
+      '--no-playlist', '--extractor-args', 'youtube:player_client=android',
       '-f', 'bestaudio/best', '--extract-audio', '--audio-format', 'mp3',
-      '-o', out3, url
+      '-o', out, url
     ], { timeout: 120000 })
     const file = join(TEMP_DIR, `play_${ts}_a.mp3`)
     if (existsSync(file) && readFileSync(file).length > 1000) return file
-  } catch (e) { console.log('YT strategy 3 failed:', e.message) }
+  } catch {}
 
-  throw new Error('YouTube bloqueó la descarga. Configura cookies con .ytcookies')
+  throw new Error('YouTube bloqueó el servidor. Usa .ytcookies con cookies FRESCAS')
 }
 
 async function downloadVideo(url) {
   const ts = Date.now()
   const hasCookies = existsSync(YT_COOKIE_PATH)
-  const baseArgs = ['--no-playlist', ...jsRuntimeArgs(), '-f', 'best[ext=mp4]/best', '--merge-output-format', 'mp4']
 
   if (hasCookies) {
-    const out = join(TEMP_DIR, `play_v_${ts}_c.%(ext)s`)
     try {
-      await execFileAsync(YT_DLP, [...baseArgs, '--cookies', YT_COOKIE_PATH, '-o', out, url], { timeout: 180000 })
+      const out = join(TEMP_DIR, `play_v_${ts}_c.%(ext)s`)
+      await execFileAsync(YT_DLP, [
+        '--no-playlist', '--js-runtimes', `node:${process.execPath}`, '--cookies', YT_COOKIE_PATH,
+        '-f', 'best[ext=mp4]/best', '--merge-output-format', 'mp4', '-o', out, url
+      ], { timeout: 180000 })
       const file = join(TEMP_DIR, `play_v_${ts}_c.mp4`)
       if (existsSync(file) && readFileSync(file).length > 1000) return file
     } catch {}
   }
 
-  const out = join(TEMP_DIR, `play_v_${ts}.%(ext)s`)
   try {
-    await execFileAsync(YT_DLP, [...baseArgs, '-o', out, url], { timeout: 180000 })
-    const file = join(TEMP_DIR, `play_v_${ts}.mp4`)
+    const out = join(TEMP_DIR, `play_v_${ts}_a.%(ext)s`)
+    await execFileAsync(YT_DLP, [
+      '--no-playlist', '--extractor-args', 'youtube:player_client=android',
+      '-f', 'best[ext=mp4]/best', '--merge-output-format', 'mp4', '-o', out, url
+    ], { timeout: 180000 })
+    const file = join(TEMP_DIR, `play_v_${ts}_a.mp4`)
     if (existsSync(file) && readFileSync(file).length > 1000) return file
   } catch {}
 
@@ -164,6 +161,7 @@ export default async function handler(conn, m, args, db) {
 
     let sent = false
 
+    // PRIMARY: oceansaver API (no usa Railway IP)
     const dlUrl = await tryOceansaver(video.url)
     if (dlUrl) {
       try {
@@ -173,9 +171,10 @@ export default async function handler(conn, m, args, db) {
           fileName: `${video.title}.mp3`
         }, { quoted: m })
         sent = true
-      } catch {}
+      } catch (e) { console.log('Oceansaver send error:', e.message) }
     }
 
+    // FALLBACK: yt-dlp
     if (!sent) {
       const filePath = await downloadAudio(video.url)
       const buf = readFileSync(filePath)
