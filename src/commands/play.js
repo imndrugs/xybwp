@@ -8,8 +8,14 @@ import { writeFileSync, unlinkSync, readFileSync, existsSync, mkdirSync } from '
 const execFileAsync = promisify(execFile)
 const YT_DLP = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
 const TEMP_DIR = join(tmpdir(), 'bot_play')
+const YT_COOKIE_PATH = 'src/youtube_cookies.txt'
 
 if (!existsSync(TEMP_DIR)) mkdirSync(TEMP_DIR, { recursive: true })
+
+// Write YouTube cookies from env var if available
+if (process.env.YOUTUBE_COOKIES && !existsSync(YT_COOKIE_PATH)) {
+  try { writeFileSync(YT_COOKIE_PATH, process.env.YOUTUBE_COOKIES) } catch {}
+}
 
 function formatTime(seconds) {
   if (!seconds) return '00:00'
@@ -47,20 +53,34 @@ async function tryOceansaver(url) {
       if (progData?.success && progData.progress === 1000) return progData.download_url
       await new Promise(r => setTimeout(r, 3000))
     }
-  } catch {}
+  } catch (e) {
+    console.log('Oceansaver error:', e.message)
+  }
   return null
+}
+
+function getYtDlpBaseArgs(url) {
+  const args = ['--no-playlist']
+  // Try android client (no JS runtime needed)
+  args.push('--extractor-args', 'youtube:player_client=android')
+  // Use cookies if available
+  if (existsSync(YT_COOKIE_PATH)) {
+    args.push('--cookies', YT_COOKIE_PATH)
+  }
+  return args
 }
 
 async function downloadAudio(url) {
   const ts = Date.now()
   const outputPath = join(TEMP_DIR, `play_${ts}.%(ext)s`)
-  await execFileAsync(YT_DLP, [
+  const args = [
+    ...getYtDlpBaseArgs(url),
     '-f', 'bestaudio[ext=m4a]/bestaudio',
     '--extract-audio', '--audio-format', 'mp3',
     '-o', outputPath,
-    '--no-playlist',
     url
-  ], { timeout: 120000 })
+  ]
+  await execFileAsync(YT_DLP, args, { timeout: 120000 })
   const file = join(TEMP_DIR, `play_${ts}.mp3`)
   if (!existsSync(file)) throw new Error('No se generó el archivo de audio')
   return file
@@ -69,13 +89,14 @@ async function downloadAudio(url) {
 async function downloadVideo(url) {
   const ts = Date.now()
   const outputPath = join(TEMP_DIR, `play_v_${ts}.%(ext)s`)
-  await execFileAsync(YT_DLP, [
+  const args = [
+    ...getYtDlpBaseArgs(url),
     '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
     '--merge-output-format', 'mp4',
     '-o', outputPath,
-    '--no-playlist',
     url
-  ], { timeout: 180000 })
+  ]
+  await execFileAsync(YT_DLP, args, { timeout: 180000 })
   const file = join(TEMP_DIR, `play_v_${ts}.mp4`)
   if (!existsSync(file)) throw new Error('No se generó el archivo de video')
   return file
@@ -112,14 +133,14 @@ export default async function handler(conn, m, args, db) {
         await conn.sendMessage(jid, { video: buf, caption: `🎬 ${video.title}` }, { quoted: m })
         try { unlinkSync(filePath) } catch {}
       } catch (e) {
-        await conn.sendMessage(jid, { text: `❌ Error: ${e.message}` }, { quoted: m })
+        await conn.sendMessage(jid, { text: `❌ Error video: ${e.message}` }, { quoted: m })
       }
       return
     }
 
     await conn.sendMessage(jid, { text: `${infoText}\n\n⬇️ Descargando audio...` }, { quoted: m })
 
-    // Try oceansaver first (direct URL, no file needed)
+    // Try oceansaver first (direct URL, no file needed, bypasses bot detection)
     let sent = false
     const dlUrl = await tryOceansaver(video.url)
     if (dlUrl) {
@@ -130,11 +151,15 @@ export default async function handler(conn, m, args, db) {
           fileName: `${video.title}.mp3`
         }, { quoted: m })
         sent = true
-      } catch {}
+        console.log('Audio descargado via oceansaver')
+      } catch (e) {
+        console.log('Oceansaver send error:', e.message)
+      }
     }
 
     // Fallback to yt-dlp
     if (!sent) {
+      console.log('Usando yt-dlp como fallback')
       const filePath = await downloadAudio(video.url)
       const buf = readFileSync(filePath)
       await conn.sendMessage(jid, {
@@ -147,6 +172,6 @@ export default async function handler(conn, m, args, db) {
     }
   } catch (e) {
     console.error(e)
-    await conn.sendMessage(jid, { text: `❌ Error: ${e.message}` }, { quoted: m })
+    await conn.sendMessage(jid, { text: `❌ Error: ${e.message}\n\nPrueba .ytcookies para configurar cookies de YouTube` }, { quoted: m })
   }
 }
