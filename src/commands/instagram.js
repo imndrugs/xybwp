@@ -1,8 +1,8 @@
-﻿import fetch from 'node-fetch'
-import { execFile } from 'child_process'
+﻿import { execFile } from 'child_process'
 import { promisify } from 'util'
 import path from 'path'
 import fs from 'fs'
+import fetch from 'node-fetch'
 
 const execFileAsync = promisify(execFile)
 const COOKIE_PATH = 'src/instagram_cookies.txt'
@@ -12,7 +12,7 @@ const YT_DLP = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true })
 
 if (process.env.INSTAGRAM_COOKIES && !fs.existsSync(COOKIE_PATH)) {
-  try { fs.writeFileSync(COOKIE_PATH, process.env.INSTAGRAM_COOKIES) } catch (e) { console.log('Error writing cookies:', e.message) }
+  try { fs.writeFileSync(COOKIE_PATH, process.env.INSTAGRAM_COOKIES) } catch {}
 }
 
 function cleanUrl(raw) {
@@ -21,54 +21,50 @@ function cleanUrl(raw) {
 
 async function tryYtDlp(url, useCookies = true) {
   if (useCookies && !fs.existsSync(COOKIE_PATH)) return null
-  const args = useCookies ? ['--cookies', COOKIE_PATH] : []
-  const info = await execFileAsync(YT_DLP, [
-    ...args, '--dump-json', cleanUrl(url)
-  ], { timeout: 30000 })
-  const data = JSON.parse(info.stdout)
-  const isVideo = data.formats && data.formats.some(f => f.vcodec && f.vcodec !== 'none')
-  const outputPath = path.join(TEMP_DIR, `ig_${data.id}.%(ext)s`)
 
-  if (isVideo) {
-    await execFileAsync(YT_DLP, [
-      ...args, '-f', 'bestvideo+bestaudio',
-      '--merge-output-format', 'mp4',
-      '-o', outputPath, cleanUrl(url)
-    ], { timeout: 120000 })
-    const filePath = path.join(TEMP_DIR, `ig_${data.id}.mp4`)
-    return { type: 'video', path: filePath }
+  const baseArgs = useCookies ? ['--cookies', COOKIE_PATH] : []
+  const variants = [
+    [],
+    ['--extractor-args', 'instagram:api=web'],
+    ['--extractor-args', 'instagram:api=graphql'],
+  ]
+  const cleanedUrl = cleanUrl(url)
+  let lastError = null
+
+  for (const extraArgs of variants) {
+    try {
+      const info = await execFileAsync(YT_DLP, [
+        ...baseArgs, ...extraArgs, '--dump-json', cleanedUrl
+      ], { timeout: 30000 })
+      const data = JSON.parse(info.stdout)
+      const isVideo = data.formats && data.formats.some(f => f.vcodec && f.vcodec !== 'none')
+      const outputPath = path.join(TEMP_DIR, `ig_${data.id}.%(ext)s`)
+
+      if (isVideo) {
+        await execFileAsync(YT_DLP, [
+          ...baseArgs, ...extraArgs, '-f', 'bestvideo+bestaudio',
+          '--merge-output-format', 'mp4',
+          '-o', outputPath, cleanedUrl
+        ], { timeout: 120000 })
+        const filePath = path.join(TEMP_DIR, `ig_${data.id}.mp4`)
+        return { type: 'video', path: filePath }
+      }
+
+      // Single image — use the thumbnail as fallback
+      const imgUrl = data.thumbnail
+      if (imgUrl) {
+        const resp = await fetch(imgUrl)
+        const buf = Buffer.from(await resp.arrayBuffer())
+        const filePath = path.join(TEMP_DIR, `ig_${data.id}${path.extname(imgUrl) || '.jpg'}`)
+        fs.writeFileSync(filePath, buf)
+        return { type: 'image', path: filePath }
+      }
+    } catch (e) {
+      lastError = e
+    }
   }
 
-  const imgUrl = data.thumbnail
-  const ext = path.extname(new URL(imgUrl).pathname) || '.jpg'
-  const filePath = path.join(TEMP_DIR, `ig_${data.id}${ext}`)
-  const resp = await fetch(imgUrl)
-  const buf = Buffer.from(await resp.arrayBuffer())
-  fs.writeFileSync(filePath, buf)
-  return { type: 'image', path: filePath }
-}
-
-async function trySocialKit(url) {
-  const key = process.env.SOCIALKIT_KEY
-  if (!key) return null
-  try {
-    const res = await fetch("https://api.socialkit.dev/instagram/download", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ access_key: key, url, format: "mp4", quality: "720p" })
-    })
-    if (!res.ok) return null
-    const json = await res.json()
-    const downloadUrl = json?.data?.downloadUrl
-    if (!downloadUrl) return null
-    const fileResp = await fetch(downloadUrl)
-    const buf = Buffer.from(await fileResp.arrayBuffer())
-    const filePath = path.join(TEMP_DIR, `ig_socialkit_${Date.now()}.mp4`)
-    fs.writeFileSync(filePath, buf)
-    return { type: 'video', path: filePath }
-  } catch {
-    return null
-  }
+  throw lastError || new Error('Instagram: todas las variantes fallaron')
 }
 
 export default async function handler(conn, m, args, db) {
@@ -85,38 +81,35 @@ export default async function handler(conn, m, args, db) {
     text: "⏬ Descargando..."
   }, { quoted: m })
 
-  const apis = [
-    () => tryYtDlp(raw, false),
-    () => tryYtDlp(raw, true),
-    trySocialKit
+  const attempts = [
+    { fn: () => tryYtDlp(raw, false), label: 'sin cookies' },
+    { fn: () => tryYtDlp(raw, true), label: 'con cookies' },
   ]
-  for (const api of apis) {
+
+  for (const { fn, label } of attempts) {
     try {
-      const result = await api(raw)
-      if (result) {
-        const caption = result.type === 'video'
-          ? "📥 Instagram reel descargado"
-          : "📥 Instagram descargado"
-        if (result.type === 'video') {
-          await conn.sendMessage(jid, {
-            video: fs.readFileSync(result.path),
-            caption
-          }, { quoted: m })
-        } else {
-          await conn.sendMessage(jid, {
-            image: fs.readFileSync(result.path),
-            caption
-          }, { quoted: m })
-        }
-        try { fs.unlinkSync(result.path) } catch {}
-        return
+      const result = await fn()
+      if (!result) continue
+
+      if (result.type === 'video') {
+        await conn.sendMessage(jid, {
+          video: fs.readFileSync(result.path),
+          caption: "📥 Instagram reel descargado"
+        }, { quoted: m })
+      } else {
+        await conn.sendMessage(jid, {
+          image: fs.readFileSync(result.path),
+          caption: "📥 Instagram descargado"
+        }, { quoted: m })
       }
+      try { fs.unlinkSync(result.path) } catch {}
+      return
     } catch (e) {
-      console.log("IG falló:", e.message)
+      console.log(`IG falló (${label}):`, e.message)
     }
   }
 
   return conn.sendMessage(jid, {
-    text: "❌ No se pudo descargar. Verifica que el link sea válido."
+    text: "❌ No se pudo descargar. El reel puede ser privado o requerir cookies. Usa .igcookies para actualizar."
   }, { quoted: m })
 }

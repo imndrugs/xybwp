@@ -12,6 +12,7 @@ import P from 'pino'
 import dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
+import { execSync } from 'child_process'
 
 dotenv.config()
 
@@ -51,6 +52,12 @@ async function startBot() {
 
     if (connection === 'open') {
       console.log("✅ Bot conectado correctamente")
+      try {
+        execSync('yt-dlp -U', { timeout: 30000, stdio: 'pipe' })
+        console.log("✅ yt-dlp actualizado")
+      } catch (e) {
+        console.log("⚠️ No se pudo actualizar yt-dlp:", e.message)
+      }
     }
 
     if (connection === 'close') {
