@@ -13,28 +13,33 @@ export default async function handler(conn, m, args, db) {
 
   const sections = [
     {
-      title: 'INTERACTIVOS',
+      title: '🎮  interactivos',
       cmds: [
         ['kiss', 'Envía un beso a alguien'],
         ['hug', 'Envía un abrazo a alguien'],
-        ['fuck', 'Follar a alguien'],
         ['slap', 'Dar una bofetada'],
         ['pat', 'Acariciar'],
-        ['ship', 'Compatibilidad con otro usuario'],
+        ['ship', 'Compatibilidad con otro usuario']
+      ]
+    },
+    {
+      title: '🔥 NSFW',
+      cmds: [
+        ['fuck', 'Follar a alguien'],
         ['69', 'Acción +18'],
         ['anal', 'Acción anal +18'],
         ['boobs', 'Acción +18 de senos'],
         ['blowjob', 'Acción +18 de blowjob'],
-        ['pussy', 'Acción +18 de lamer'],
-        ['escupir', 'Escupe a alguien']
+        ['pussy', 'Acción +18 de lamer']
       ]
     },
     {
-      title: 'ADMINISTRACIÓN',
+      title: '⚙️ ADMINISTRACION',
       cmds: [
-        ['kick', 'Expulsa a un miembro'],
+        ['Kick', 'Expulsa a un miembro'],
         ['ban', 'Expulsar a un miembro'],
         ['sacar', 'Expulsa a un miembro'],
+        ['escupir', 'Escupe a alguien'],
         ['ezmevks', 'Elimina a todos los no admins'],
         ['setadmin', 'Da rol de admin en el bot'],
         ['deladmin', 'Quita rol de admin en el bot'],
@@ -55,20 +60,17 @@ export default async function handler(conn, m, args, db) {
       ]
     },
     {
-      title: 'DESCARGAS',
+      title: '📱 Descargas',
       cmds: [
-        ['tiktok', 'Descarga videos de TikTok'],
-        ['tt', 'Descarga videos de TikTok'],
-        ['instagram', 'Descarga de Instagram'],
-        ['ig', 'Descarga de Instagram'],
+        ['tt / tiktok', 'Descarga videos de tiktok'],
+        ['ig / instagram', 'Descarga videos de ig'],
         ['sticker', 'Crea sticker'],
-        ['s', 'Crear sticker'],
         ['wm', 'Crea sticker con marca de agua / Robar stickers'],
         ['brat', 'Sticker con texto personalizado']
       ]
     },
     {
-      title: 'UTILIDADES',
+      title: '💬 Utilidades',
       cmds: [
         ['ping', 'Latencia del bot'],
         ['proofs', 'Latencia del bot'],
@@ -76,24 +78,23 @@ export default async function handler(conn, m, args, db) {
         ['pg', 'Limpia mensajes recientes'],
         ['curp', 'Genera CURP en PDF'],
         ['creador', 'Info del creador'],
-        ['menu', 'Menu general del bot']
+        ['altera', 'Info de altera'],
+        ['menu', 'Este menú']
       ]
     }
   ]
 
-  let text = 'COMANDOS\n'
-  text += '═'.repeat(20) + '\n\n'
+  let text = '¡Hola! 👋🏻\n\n'
 
   for (const section of sections) {
-    text += section.title + '\n'
+    text += `> ${section.title}\n`
     for (const [cmd, desc] of section.cmds) {
-      text += `  ${cmd.padEnd(12)} ${desc}\n`
+      text += `*${cmd}* — _${desc}_\n\n`
     }
-    text += '\n'
   }
 
-  text += '═'.repeat(20) + '\n'
-  text += `${totalMembers} miembros  ·  ${admins} admins`
+  text += '═══════════════\n'
+  text += `*${totalMembers} miembros  ·  ${admins} admins*`
 
   await conn.sendMessage(jid, { text }, { quoted: m })
 }
