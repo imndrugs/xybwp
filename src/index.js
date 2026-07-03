@@ -181,10 +181,17 @@ async function startBot() {
     }
   })
 
-  conn.ev.on('messages.upsert', async ({ messages }) => {
-    const m = messages[0]
+  const processedIds = new Set()
 
-    if (!m?.key?.remoteJid) return
+  conn.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return
+    const m = messages[0]
+    if (!m?.key?.remoteJid || m.key.fromMe) return
+
+    const msgId = m.key.id
+    if (processedIds.has(msgId)) return
+    processedIds.add(msgId)
+    if (processedIds.size > 1000) processedIds.clear()
 
     // --- NOTIFICAR CAMBIOS DE ADMIN ---
     if (m.messageStubType === 29 || m.messageStubType === 30) {
