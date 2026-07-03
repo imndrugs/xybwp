@@ -20,7 +20,7 @@ export default async function handler(conn, m) {
     try {
       await conn.sendMessage(jid, { text })
     } catch {}
-  }, 1500)
+  }, 800)
 
   global._spamIntervals.set(jid, interval)
 }

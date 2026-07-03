@@ -5,7 +5,8 @@ function getJid(m) {
 import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  DisconnectReason
+  DisconnectReason,
+  downloadMediaMessage
 } from '@whiskeysockets/baileys'
 
 import P from 'pino'
@@ -194,12 +195,15 @@ async function startBot() {
     if (processedIds.size > 1000) processedIds.clear()
 
     // --- SAVE PHOTOS FOR .VER ---
-    if (m.message?.imageMessage) {
+    if (m.message?.imageMessage || m.message?.videoMessage) {
       if (!global._savedPhotos) global._savedPhotos = new Map()
       const chat = getChat(m)
-      conn.downloadMediaMessage(m).then(buf => {
+      try {
+        const buf = await downloadMediaMessage(m)
         global._savedPhotos.set(m.key.id, { buffer: buf, chat, sender: m.key.participant })
-      }).catch(() => {})
+      } catch (e) {
+        console.log("Error saving media:", e.message)
+      }
     }
 
     // --- NOTIFICAR CAMBIOS DE ADMIN ---
