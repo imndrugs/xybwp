@@ -1,0 +1,8 @@
+node_modules
+sessions
+temp
+.env
+.git
+.gitignore
+*.md
+src/instagram_cookies.txt

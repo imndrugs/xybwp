@@ -11,16 +11,19 @@ const YT_DLP = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
 
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true })
 
+if (process.env.INSTAGRAM_COOKIES && !fs.existsSync(COOKIE_PATH)) {
+  try { fs.writeFileSync(COOKIE_PATH, process.env.INSTAGRAM_COOKIES) } catch (e) { console.log('Error writing cookies:', e.message) }
+}
+
 function cleanUrl(raw) {
   return raw.replace(/\?.*/, '').replace(/\/$/, '')
 }
 
-async function tryYtDlp(url) {
-  if (!fs.existsSync(COOKIE_PATH)) return null
+async function tryYtDlp(url, useCookies = true) {
+  if (useCookies && !fs.existsSync(COOKIE_PATH)) return null
+  const args = useCookies ? ['--cookies', COOKIE_PATH] : []
   const info = await execFileAsync(YT_DLP, [
-    '--cookies', COOKIE_PATH,
-    '--dump-json',
-    cleanUrl(url)
+    ...args, '--dump-json', cleanUrl(url)
   ], { timeout: 30000 })
   const data = JSON.parse(info.stdout)
   const isVideo = data.formats && data.formats.some(f => f.vcodec && f.vcodec !== 'none')
@@ -28,11 +31,9 @@ async function tryYtDlp(url) {
 
   if (isVideo) {
     await execFileAsync(YT_DLP, [
-      '--cookies', COOKIE_PATH,
-      '-f', 'bestvideo+bestaudio',
+      ...args, '-f', 'bestvideo+bestaudio',
       '--merge-output-format', 'mp4',
-      '-o', outputPath,
-      cleanUrl(url)
+      '-o', outputPath, cleanUrl(url)
     ], { timeout: 120000 })
     const filePath = path.join(TEMP_DIR, `ig_${data.id}.mp4`)
     return { type: 'video', path: filePath }
@@ -84,7 +85,11 @@ export default async function handler(conn, m, args, db) {
     text: "⏬ Descargando..."
   }, { quoted: m })
 
-  const apis = [tryYtDlp, trySocialKit]
+  const apis = [
+    () => tryYtDlp(raw, false),
+    () => tryYtDlp(raw, true),
+    trySocialKit
+  ]
   for (const api of apis) {
     try {
       const result = await api(raw)
