@@ -9,6 +9,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 
 import P from 'pino'
+import dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
 
