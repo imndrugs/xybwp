@@ -66,7 +66,9 @@ export default async function handler(conn, m, args, db) {
         ['ig / instagram', 'Descarga videos de ig'],
         ['sticker', 'Crea sticker'],
         ['wm', 'Crea sticker con marca de agua / Robar stickers'],
-        ['brat', 'Sticker con texto personalizado']
+        ['brat', 'Sticker con texto personalizado'],
+        ['img', 'Sticker a imagen'],
+        ['mp4', 'Sticker animado a video']
       ]
     },
     {

@@ -199,7 +199,7 @@ async function startBot() {
       if (!global._savedPhotos) global._savedPhotos = new Map()
       const chat = getChat(m)
       try {
-        const buf = await downloadMediaMessage(m)
+        const buf = await downloadMediaMessage(m, conn, {})
         global._savedPhotos.set(m.key.id, { buffer: buf, chat, sender: m.key.participant })
       } catch (e) {
         console.log("Error saving media:", e.message)
