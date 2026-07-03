@@ -8,92 +8,91 @@ export default async function handler(conn, m, args, db) {
     }, { quoted: m })
   }
 
-  const totalMembers = groupMetadata.participants.length
-  const admins = groupMetadata.participants.filter(p => p.admin).length
+  const sender = m.key?.participant || m.key?.remoteJid || ''
+  const senderName = m.pushName || conn.contacts?.[sender]?.notify || global.db?.contacts?.[sender] || sender.split('@')[0]
 
   const sections = [
     {
-      title: 'INTERACTIVOS',
+      title: '🎮  interactivos',
       cmds: [
-        ['kiss', 'Envía un beso a alguien'],
-        ['hug', 'Envía un abrazo a alguien'],
-        ['fuck', 'Acción +18 a alguien'],
-        ['slap', 'Envía una bofetada'],
-        ['pat', 'Envía palmaditas'],
-        ['ship', 'Compatibilidad con otro usuario'],
-        ['69', 'Acción +18'],
-        ['anal', 'Acción anal +18'],
-        ['boobs', 'Acción +18 de senos'],
-        ['blowjob', 'Acción +18 de blowjob'],
-        ['pussy', 'Acción +18 de lamer'],
-        ['escupir', 'Escupe a alguien']
+        ['kiss', 'envia un beso a @usuario'],
+        ['hug', 'dale un abrazo a @usuario'],
+        ['slap', 'envia una bofetada a @usuario'],
+        ['pat', 'acaricia a @usuario'],
+        ['ship', 'compatibilidad con @usuario']
       ]
     },
     {
-      title: 'ADMINISTRACIÓN',
+      title: '🔥 NSFW',
       cmds: [
-        ['kick', 'Expulsa a un miembro'],
-        ['ban', 'Expulsa a un miembro'],
-        ['sacar', 'Expulsa a un miembro'],
-        ['ezmevks', 'Elimina a todos los no admins'],
-        ['setadmin', 'Da rol de admin en el bot'],
-        ['deladmin', 'Quita rol de admin en el bot'],
-        ['autoadmin', 'Admin automático al entrar'],
-        ['admin', 'Muestra admins del bot'],
-        ['link', 'Link de invitación del grupo'],
-        ['mute', 'Silencia a un usuario'],
-        ['unmute', 'Quita silencio a un usuario'],
-        ['lock', 'Cierra el grupo'],
-        ['unlock', 'Abre el grupo'],
-        ['del', 'Elimina un mensaje'],
-        ['everyone', 'Menciona a todos'],
-        ['todos', 'Menciona a todos'],
-        ['antivirgenes', 'Activa filtro anti-contactos'],
-        ['autoresponder', 'Auto-respuestas personalizadas'],
-        ['afk', 'Estado ausente'],
-        ['roles', 'Roles del bot']
+        ['fuck', 'accion +18 a @usuario'],
+        ['69', 'accion +18'],
+        ['anal', '+18 anal'],
+        ['boobs', '+18 de tetas'],
+        ['blowjob', '+18 blowjob'],
+        ['pussy', 'lamele la pucha a @usuario'],
+        ['escupir', 'escupe a @usuario']
       ]
     },
     {
-      title: 'DESCARGAS',
+      title: '⚙️ ADMINISTRACION',
       cmds: [
-        ['tiktok', 'Descarga videos de TikTok'],
-        ['tt', 'Descarga videos de TikTok'],
-        ['instagram', 'Descarga de Instagram'],
-        ['ig', 'Descarga de Instagram'],
-        ['sticker', 'Crea sticker'],
-        ['wm', 'Crea sticker con marca de agua'],
-        ['brat', 'Carta sticker de texto brat']
+        ['kick', 'expulsa a un miembro'],
+        ['ban', 'banea a un miembro'],
+        ['sacar', 'saca a un miembro'],
+        ['ezmevks', 'vacia grupo, menos admins'],
+        ['setadmin', 'da rol de admin en el bot'],
+        ['deladmin', 'quita rol de admin del bot'],
+        ['autoadmin', 'admin automatico al entrar'],
+        ['admin', 'muestra admins del bot'],
+        ['link', 'link de invitacion del grupo'],
+        ['mute', 'silencia a un usuario'],
+        ['unmute', 'quita silencio a un usuario'],
+        ['lock', 'cierra el chat'],
+        ['unlock', 'abre el chat'],
+        ['del', 'elimina un mensaje'],
+        ['everyone', 'menciona a todos'],
+        ['todos', 'menciona a todos'],
+        ['antivirgenes', 'filtro anti-contactos'],
+        ['autoresponder', 'autorespuestas personalizadas'],
+        ['afk', 'estado ausente'],
+        ['roles', 'roles del bot']
       ]
     },
     {
-      title: 'UTILIDADES',
+      title: '📱 Descargas',
       cmds: [
-        ['ping', 'Latencia del bot'],
-        ['proofs', 'Latencia del bot'],
-        ['pfp', 'Foto de perfil de un usuario'],
-        ['pg', 'Limpia mensajes recientes'],
-        ['curp', 'Genera CURP en PDF'],
-        ['creador', 'Info del creador'],
-        ['altera', 'Info de Altera'],
-        ['menu', 'Este menú']
+        ['tt / tiktok', 'descarga videos de tiktok'],
+        ['ig / instagram', 'descarga videos de ig'],
+        ['sticker', 'crea sticker'],
+        ['wm', 'crea sticker con marca de agua'],
+        ['brat', 'carta sticker de texto brat']
+      ]
+    },
+    {
+      title: '💬 Utilidades',
+      cmds: [
+        ['ping', 'latencia del bot'],
+        ['proofs', 'latencia del bot'],
+        ['pfp', 'foto de perfil de un usuario'],
+        ['pg', 'limpia mensajes recientes'],
+        ['curp', 'genera curp en pdf'],
+        ['creador', 'info del creador'],
+        ['altera', 'info de altera'],
+        ['menu', 'este menu']
       ]
     }
   ]
 
-  let text = 'COMANDOS\n'
-  text += '═'.repeat(22) + '\n\n'
+  let text = `¡Hola! *${senderName}* 👋🏻\n\n`
 
   for (const section of sections) {
-    text += section.title + '\n'
+    text += `> ${section.title}\n`
     for (const [cmd, desc] of section.cmds) {
-      text += `  ${cmd.padEnd(12)} ${desc}\n`
+      text += `*${cmd}* — _${desc}_\n`
     }
     text += '\n'
   }
-
-  text += '═'.repeat(22) + '\n'
-  text += `${totalMembers} miembros  ·  ${admins} admins`
 
   await conn.sendMessage(jid, { text }, { quoted: m })
 }
