@@ -1,4 +1,4 @@
-import { downloadMediaMessage } from '@whiskeysockets/baileys'
+import { downloadContentFromMessage } from '@whiskeysockets/baileys'
 import { execSync } from 'child_process'
 import { tmpdir } from 'os'
 import { writeFileSync, unlinkSync, readFileSync } from 'fs'
@@ -15,8 +15,10 @@ export default async function handler(conn, m) {
   }
 
   try {
-    const mediaMessage = { message: { stickerMessage: quotedMsg.stickerMessage }, key: m.key }
-    const buffer = await downloadMediaMessage(mediaMessage, conn, {})
+    const stream = await downloadContentFromMessage(quotedMsg.stickerMessage, 'sticker')
+    const chunks = []
+    for await (const chunk of stream) chunks.push(chunk)
+    const buffer = Buffer.concat(chunks)
 
     const tmpInput = join(tmpdir(), `${Date.now()}.webp`)
     const tmpOutput = join(tmpdir(), `${Date.now()}.mp4`)
