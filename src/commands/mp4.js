@@ -24,7 +24,21 @@ export default async function handler(conn, m) {
     const tmpOutput = join(tmpdir(), `${Date.now()}.mp4`)
     writeFileSync(tmpInput, buffer)
 
-    execSync(`ffmpeg -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart "${tmpOutput}"`, { timeout: 15000 })
+    const encoders = ['libx264', 'h264', 'libx264rgb', 'mpeg4']
+    let ok = false
+    for (const enc of encoders) {
+      try {
+        execSync(
+          `ffmpeg -y -i "${tmpInput}" -c:v ${enc} -pix_fmt yuv420p -an "${tmpOutput}"`,
+          { timeout: 30000, stdio: 'pipe' }
+        )
+        if (readFileSync(tmpOutput).length > 100) { ok = true; break }
+      } catch {}
+    }
+
+    if (!ok) {
+      throw new Error('No se pudo codificar el video con ningun encoder')
+    }
 
     const mp4Buffer = readFileSync(tmpOutput)
     await conn.sendMessage(jid, { video: mp4Buffer, caption: 'Sticker animado convertido' }, { quoted: m })
@@ -33,6 +47,6 @@ export default async function handler(conn, m) {
     try { unlinkSync(tmpOutput) } catch {}
   } catch (e) {
     console.error(e)
-    await conn.sendMessage(jid, { text: 'No pude convertir el sticker' }, { quoted: m })
+    await conn.sendMessage(jid, { text: `No pude convertir el sticker: ${e.message}` }, { quoted: m })
   }
 }

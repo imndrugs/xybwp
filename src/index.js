@@ -6,7 +6,6 @@ import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
-  downloadContentFromMessage
 } from '@whiskeysockets/baileys'
 
 import P from 'pino'
@@ -197,15 +196,7 @@ async function startBot() {
     // --- SAVE PHOTOS FOR .VER ---
     if (m.message?.imageMessage) {
       if (!global._savedPhotos) global._savedPhotos = new Map()
-      const chat = getChat(m)
-      try {
-        const stream = await downloadContentFromMessage(m.message.imageMessage, 'image')
-        const chunks = []
-        for await (const chunk of stream) chunks.push(chunk)
-        global._savedPhotos.set(m.key.id, { buffer: Buffer.concat(chunks), chat, sender: m.key.participant })
-      } catch (e) {
-        console.log("Error saving media:", e.message)
-      }
+      global._savedPhotos.set(m.key.id, { imageMessage: m.message.imageMessage, chat: getChat(m) })
     }
 
     // --- NOTIFICAR CAMBIOS DE ADMIN ---
