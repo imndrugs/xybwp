@@ -1,29 +1,44 @@
 ﻿import fetch from 'node-fetch'
 
-async function tryRapid(url) {
-  const res = await fetch("https://social-download-all-in-one.p.rapidapi.com/v1/social/autolink", {
+async function tryInstasave(url) {
+  const res = await fetch("https://instasave.io/api/v1/convert", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-rapidapi-key": process.env.RAPIDAPI_KEY || "07f782a02dmshfe7cb2bc7497fbdp1ed662jsn34aaf6a6a338",
-      "x-rapidapi-host": "social-download-all-in-one.p.rapidapi.com"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url })
   })
   const json = await res.json()
   return json?.video || json?.image || json?.media?.[0]?.url || json?.url || json?.download_url || null
 }
 
-async function tryAkuari(url) {
-  const res = await fetch(`https://api.akuari.my.id/downloader/instagram?link=${encodeURIComponent(url)}`)
+async function tryRapid(url) {
+  const key = process.env.RAPIDAPI_KEY || "07f782a02dmshfe7cb2bc7497fbdp1ed662jsn34aaf6a6a338"
+  const res = await fetch("https://instagram-downloader-download-instagram-videos-stories.p.rapidapi.com/index", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-rapidapi-key": key,
+      "x-rapidapi-host": "instagram-downloader-download-instagram-videos-stories.p.rapidapi.com"
+    },
+    body: JSON.stringify({ url })
+  })
   const json = await res.json()
-  return json?.result?.video?.[0] || json?.result?.image?.[0] || json?.url || json?.video || null
+  return json?.media || json?.video || json?.image || json?.url || json?.download_url || null
 }
 
-async function tryRestapi(url) {
-  const res = await fetch(`https://restapi.akuari.my.id/downloader/instagram?link=${encodeURIComponent(url)}`)
-  const json = await res.json()
-  return json?.result?.video?.[0] || json?.result?.image?.[0] || json?.url || json?.video || json?.data?.url || null
+async function tryScrape(url) {
+  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } })
+  const html = await res.text()
+  const patterns = [
+    /"video_url":"([^"]+)"/,
+    /property="og:video"[^>]+content="([^"]+)"/,
+    /"display_url":"([^"]+)"/,
+    /"download_url":"([^"]+)"/
+  ]
+  for (const p of patterns) {
+    const m = html.match(p)
+    if (m) return m[1].replace(/\\u0026/g, "&")
+  }
+  return null
 }
 
 export default async function handler(conn, m, args, db) {
@@ -40,7 +55,7 @@ export default async function handler(conn, m, args, db) {
     text: "⏬ Descargando contenido de Instagram..."
   }, { quoted: m })
 
-  const apis = [tryRapid, tryAkuari, tryRestapi]
+  const apis = [tryScrape, tryInstasave, tryRapid]
   for (const api of apis) {
     try {
       const mediaUrl = await api(url)
