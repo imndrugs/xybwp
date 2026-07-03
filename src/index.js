@@ -9,8 +9,6 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 
 import P from 'pino'
-import qrcode from 'qrcode-terminal'
-import dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
 
@@ -46,8 +44,8 @@ async function startBot() {
     const { connection, lastDisconnect, qr } = update
 
     if (qr) {
-      console.log("📱 Escanea el QR:")
-      qrcode.generate(qr, { small: true })
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`
+      console.log("📱 Escanea este QR (abre el link):", qrUrl)
     }
 
     if (connection === 'open') {
