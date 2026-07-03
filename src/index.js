@@ -33,9 +33,12 @@ async function startBot() {
     admins: [],
     muted: [],
     autoresponder: {},
-    afk: {}
+    afk: {},
+    antivirgenes: []
   }
 }
+
+  global._msgLog = {}
 
   conn.ev.on('creds.update', saveCreds)
 
@@ -73,7 +76,15 @@ async function startBot() {
         if (parsed.data) {
           if (parsed.data.admins) global.db.data.admins = parsed.data.admins
           if (parsed.data.muted) global.db.data.muted = parsed.data.muted
-          if (parsed.data.autoresponder) global.db.data.autoresponder = parsed.data.autoresponder
+          if (parsed.data.antivirgenes) global.db.data.antivirgenes = parsed.data.antivirgenes
+          if (parsed.data.autoresponder) {
+            const ar = parsed.data.autoresponder
+            if (typeof ar[Object.keys(ar)[0]] === 'string') {
+              global.db.data.autoresponder = { global: { ...ar } }
+            } else {
+              global.db.data.autoresponder = ar
+            }
+          }
           if (parsed.data.afk) global.db.data.afk = parsed.data.afk
         }
       }
@@ -87,6 +98,7 @@ async function startBot() {
         data: {
           admins: global.db.data?.admins || [],
           muted: global.db.data?.muted || [],
+          antivirgenes: global.db.data?.antivirgenes || [],
           autoresponder: global.db.data?.autoresponder || {},
           afk: global.db.data?.afk || {}
         }
@@ -99,6 +111,7 @@ async function startBot() {
   if (!conn.contacts) conn.contacts = {}
   if (!global.db.data) global.db.data = {}
   if (!global.db.data.muted) global.db.data.muted = []
+  if (!global.db.data.antivirgenes) global.db.data.antivirgenes = []
   if (!global.db.data.autoresponder) global.db.data.autoresponder = {}
   if (!global.db.data.afk) global.db.data.afk = {}
 
@@ -152,11 +165,51 @@ async function startBot() {
     return conn.contacts?.[key]?.notify || global.db.contacts?.[key] || key.split('@')[0]
   }
 
+  // --- NOTIFICAR CAMBIOS DE ADMIN (via event) ---
+  conn.ev.on('group-participants.update', async ({ id, participants, action, author }) => {
+    if (!id?.endsWith?.('@g.us')) return
+    if (action !== 'promote' && action !== 'demote') return
+    const actorJid = (typeof author === 'string' ? author : author?.jid || '')
+    const affected = participants.map(p => (typeof p === 'string' ? p : p?.jid || '')).filter(Boolean)
+    const allJids = [actorJid, ...affected].filter(Boolean)
+    const actorMention = actorJid ? ` @${actorJid.split('@')[0]}` : ''
+    const affectedMentions = affected.map(j => `@${j.split('@')[0]}`).join(', ')
+    const text = action === 'promote'
+      ? `⭐${actorMention} promovió a ${affectedMentions} como admin`
+      : `⬇️${actorMention} quitó admin a ${affectedMentions}`
+    if (text.length > 5) {
+      await conn.sendMessage(id, { text, mentions: allJids }).catch(() => {})
+    }
+  })
+
   conn.ev.on('messages.upsert', async ({ messages }) => {
     const m = messages[0]
 
-    if (!m?.message) return
     if (!m?.key?.remoteJid) return
+
+    // --- NOTIFICAR CAMBIOS DE ADMIN ---
+    if (m.messageStubType === 29 || m.messageStubType === 30) {
+      const id = m.key.remoteJid
+      if (!id.endsWith('@g.us')) return
+      const params = m.messageStubParameters || []
+      const action = m.messageStubType === 29 ? 'promote' : 'demote'
+      const actorJid = m.key?.participant || ''
+      const affected = params
+        .map(j => j.includes('@') ? j : j + '@s.whatsapp.net')
+        .filter(j => j.split('@')[0].length > 5)
+      const allJids = [actorJid, ...affected].filter(Boolean)
+      const actorMention = actorJid ? ` @${actorJid.split('@')[0]}` : ''
+      const affectedMentions = affected.map(j => `@${j.split('@')[0]}`).join(', ')
+      const text = action === 'promote'
+        ? `⭐${actorMention} promovió a ${affectedMentions} como admin`
+        : `⬇️${actorMention} quitó admin a ${affectedMentions}`
+      if (text.length > 5) {
+        await conn.sendMessage(id, { text, mentions: allJids }).catch(() => {})
+      }
+      return
+    }
+
+    if (!m?.message) return
 
     const chat = getChat(m)
     if (!chat) return
@@ -164,6 +217,15 @@ async function startBot() {
     const isGroup = chat.endsWith('@g.us')
     const sender = normalizedId(m.key?.participant || m.key?.remoteJid)
     const botJid = normalizedId(conn.user?.id || conn.user?.jid || '')
+
+    // --- TRACK MESSAGES FOR .PG ---
+    if (m.key?.id && sender) {
+      if (!global._msgLog[chat]) global._msgLog[chat] = {}
+      if (!global._msgLog[chat][sender]) global._msgLog[chat][sender] = []
+      const log = global._msgLog[chat][sender]
+      log.push({ id: m.key.id, participant: m.key.participant, fromMe: m.key.fromMe })
+      if (log.length > 20) log.splice(0, log.length - 20)
+    }
 
     // --- MUTE SYSTEM ---
     if (isGroup && global.db.data?.muted?.includes(sender) && sender !== botJid) {
@@ -173,6 +235,24 @@ async function startBot() {
         console.log("Mute delete error:", e)
       }
       return
+    }
+
+    // --- AFK AUTO-REMOVE: si el usuario AFK escribe algo, salir de AFK ---
+    if (isGroup && global.db.data?.afk?.[sender]) {
+      const afkData = global.db.data.afk[sender]
+      delete global.db.data.afk[sender]
+      const elapsed = Math.floor((Date.now() - afkData.since) / 1000)
+      const mins = Math.floor(elapsed / 60)
+      const secs = elapsed % 60
+      const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
+      try {
+        const raw = JSON.parse(fs.readFileSync(dataFile, 'utf8') || '{}')
+        if (raw.data?.afk?.[sender]) delete raw.data.afk[sender]
+        fs.writeFileSync(dataFile, JSON.stringify(raw, null, 2))
+      } catch {}
+      await conn.sendMessage(chat, {
+        text: `✨ Bienvenido de vuelta!\n\nEstuviste AFK durante ${timeStr}`
+      }, { quoted: m })
     }
 
     // --- AFK CHECK ---
@@ -193,19 +273,30 @@ async function startBot() {
       }
     }
 
-    // --- AUTORESPONDER ---
+    // --- AUTORESPONDER (per-group) ---
     if (isGroup) {
       const textContent =
         m.message.conversation ||
         m.message.extendedTextMessage?.text ||
         ''
-      const autoresponder = global.db.data?.autoresponder || {}
-      for (const [trigger, response] of Object.entries(autoresponder)) {
+      const ar = global.db.data?.autoresponder || {}
+      const groupTriggers = { ...(ar['global'] || {}), ...(ar[chat] || {}) }
+      for (const [trigger, response] of Object.entries(groupTriggers)) {
         if (textContent.toLowerCase().includes(trigger.toLowerCase())) {
           await conn.sendMessage(chat, { text: response }, { quoted: m })
           break
         }
       }
+    }
+
+    // --- ANTIVIRGENES: borrar mensaje y expulsar si comparten contacto ---
+    if (isGroup && global.db.data?.antivirgenes?.includes(chat) && (m.message?.contactMessage || m.message?.contactsArrayMessage)) {
+      const target = m.key?.participant || m.key?.remoteJid
+      if (target && sender !== botJid) {
+        conn.sendMessage(chat, { delete: { remoteJid: chat, fromMe: false, id: m.key.id, participant: m.key.participant } }).catch(() => {})
+        await conn.groupParticipantsUpdate(chat, [target], 'remove').catch(() => {})
+      }
+      return
     }
 
     // --- TAG BOT RESPONSE ---
