@@ -20,7 +20,9 @@ export default async function handler(conn, m, args, db) {
 
   db.data.admins = db.data.admins.filter(a => a !== id)
 
-  const text = `🗑️ ADMIN REMOVIDO\n\nUsuario: ${id}`
+  const contactName = db.contacts?.[id + '@s.whatsapp.net'] || id
+
+  const text = `🗑️ ADMIN REMOVIDO\n\nUsuario: ${contactName}`
 
   return conn.sendMessage(jid, {
     text

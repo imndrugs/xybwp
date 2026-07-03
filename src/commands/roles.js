@@ -1,28 +1,24 @@
 import { OWNER_IDS } from "../lib/perms.js"
 
-function formatPhone(number = "") {
-  const digits = String(number || "").replace(/\D/g, "")
-  if (!digits) return ""
+function normalize(jid) {
+  if (!jid) return ''
+  return jid.split('@')[0].split(':')[0] + '@s.whatsapp.net'
+}
 
-  if (digits.length === 12 && digits.startsWith("52")) {
-    return `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 8)} ${digits.slice(8)}`
-  }
-
-  if (digits.length > 10) {
-    return `+${digits}`
-  }
-
-  return digits
+function getName(db, jid) {
+  const key = normalize(jid)
+  return db.contacts?.[key] || key.split('@')[0]
 }
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ""
   const admins = db?.data?.admins || []
 
-  const ownerNumber = formatPhone(OWNER_IDS[0] || "")
-  const adminList = admins.map((admin) => formatPhone(admin)).filter(Boolean)
+  const ownerNumber = OWNER_IDS[0] || ""
+  const ownerName = getName(db, ownerNumber)
+  const adminList = admins.map((admin) => getName(db, admin)).filter(Boolean)
 
-  let text = `👑 ROLES\n\n👤 OWNER\n${ownerNumber || "sin configurar"}\n\n🛡️ ADMINISTRADORES\n${adminList.length ? adminList.join("\n") : "Ninguno"}`
+  let text = `👑 ROLES\n\n👤 OWNER\n${ownerName || "sin configurar"}\n\n🛡️ ADMINISTRADORES\n${adminList.length ? adminList.join("\n") : "Ninguno"}`
 
   return conn.sendMessage(jid, { text }, { quoted: m })
 }

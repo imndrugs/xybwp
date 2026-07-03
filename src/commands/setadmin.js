@@ -40,7 +40,9 @@ export default async function handler(conn, m, args, db) {
     db.data.admins.push(id)
   }
 
-  const text = `✅ ADMIN AGREGADO\n\nUsuario: ${id}`
+  const contactName = db.contacts?.[id + '@s.whatsapp.net'] || id
+
+  const text = `✅ ADMIN AGREGADO\n\nUsuario: ${contactName}`
 
   return conn.sendMessage(jid, {
     text

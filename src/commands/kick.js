@@ -49,9 +49,14 @@ export default async function handler(conn, m, args, db) {
     }
   }
 
+  function getName(jid) {
+    const key = jid.split('@')[0].split(':')[0] + '@s.whatsapp.net'
+    return db.contacts?.[key] || conn.contacts?.[key]?.notify || key.split('@')[0]
+  }
+
   let text = ''
   if (kicked.length) {
-    text += `👢 Expulsados:\n` + kicked.map(u => `@${u.split('@')[0]}`).join('\n')
+    text += `👢 Expulsados:\n` + kicked.map(u => `• ${getName(u)}`).join('\n')
   }
   if (errors.length) {
     if (text) text += '\n\n'

@@ -1,4 +1,8 @@
 import { downloadMediaMessage } from '@whiskeysockets/baileys'
+import { execSync } from 'child_process'
+import { tmpdir } from 'os'
+import { writeFileSync, unlinkSync, readFileSync } from 'fs'
+import { join } from 'path'
 import { makeSticker } from '../lib/sticker.js'
 import { getSenderId } from '../lib/perms.js'
 
@@ -43,16 +47,32 @@ export default async function handler(conn, m, args, db) {
       quotedMsg?.stickerMessage
 
     if (!media) {
-      return conn.sendMessage(jid, { text: '🖼️ Responde a una imagen o video con .sticker' }, { quoted: m })
+      return conn.sendMessage(jid, { text: '🖼️ Responde a una imagen, video o GIF con .sticker' }, { quoted: m })
     }
 
     const buffer = await downloadMediaMessage(mediaMessage, conn, {})
 
-    const stickerBuffer = await makeSticker(buffer, { packname, author })
+    const isVideo = !!message.videoMessage || !!quotedMsg?.videoMessage || media?.mimetype?.startsWith('video/') || false
 
-    await conn.sendMessage(jid, {
-      sticker: stickerBuffer
-    }, { quoted: m })
+    if (isVideo) {
+      const tmpInput = join(tmpdir(), `${Date.now()}.mp4`)
+      const tmpOutput = join(tmpdir(), `${Date.now()}.webp`)
+      try {
+        writeFileSync(tmpInput, buffer)
+        execSync(
+          `ffmpeg -i "${tmpInput}" -vcodec libwebp -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=15" -loop 0 -an -y "${tmpOutput}"`,
+          { timeout: 30000 }
+        )
+        const webpBuffer = readFileSync(tmpOutput)
+        await conn.sendMessage(jid, { sticker: webpBuffer }, { quoted: m })
+      } finally {
+        try { unlinkSync(tmpInput) } catch {}
+        try { unlinkSync(tmpOutput) } catch {}
+      }
+    } else {
+      const stickerBuffer = await makeSticker(buffer, { packname, author })
+      await conn.sendMessage(jid, { sticker: stickerBuffer }, { quoted: m })
+    }
   } catch (error) {
     console.error(error)
     await conn.sendMessage(jid, { text: '❌ No pude crear el sticker' }, { quoted: m })

@@ -30,7 +30,10 @@ async function startBot() {
 
   global.db = {
   data: {
-    admins: []
+    admins: [],
+    muted: [],
+    autoresponder: {},
+    afk: {}
   }
 }
 
@@ -59,27 +62,62 @@ async function startBot() {
     }
   })
 
-  const contactsFile = path.join(process.cwd(), 'contacts.json')
-  global.db.contacts = {}
-  if (!conn.contacts) conn.contacts = {}
+  const dataFile = path.join(process.cwd(), 'database.json')
 
-  try {
-    const data = fs.readFileSync(contactsFile, 'utf8')
-    global.db.contacts = JSON.parse(data)
-    for (const [key, name] of Object.entries(global.db.contacts)) {
-      conn.contacts[key] = { id: key, notify: name, name: name }
-    }
-  } catch {}
+  function loadDB() {
+    try {
+      const raw = fs.readFileSync(dataFile, 'utf8')
+      const parsed = JSON.parse(raw)
+      if (parsed) {
+        if (parsed.contacts) global.db.contacts = parsed.contacts
+        if (parsed.data) {
+          if (parsed.data.admins) global.db.data.admins = parsed.data.admins
+          if (parsed.data.muted) global.db.data.muted = parsed.data.muted
+          if (parsed.data.autoresponder) global.db.data.autoresponder = parsed.data.autoresponder
+          if (parsed.data.afk) global.db.data.afk = parsed.data.afk
+        }
+      }
+    } catch {}
+  }
+
+  function saveDB() {
+    try {
+      const toSave = {
+        contacts: global.db.contacts || {},
+        data: {
+          admins: global.db.data?.admins || [],
+          muted: global.db.data?.muted || [],
+          autoresponder: global.db.data?.autoresponder || {},
+          afk: global.db.data?.afk || {}
+        }
+      }
+      fs.writeFileSync(dataFile, JSON.stringify(toSave, null, 2))
+    } catch {}
+  }
+
+  if (!global.db.contacts) global.db.contacts = {}
+  if (!conn.contacts) conn.contacts = {}
+  if (!global.db.data) global.db.data = {}
+  if (!global.db.data.muted) global.db.data.muted = []
+  if (!global.db.data.autoresponder) global.db.data.autoresponder = {}
+  if (!global.db.data.afk) global.db.data.afk = {}
+
+  loadDB()
+
+  const normalizedId = (jid) => {
+    if (!jid) return ''
+    return jid.split('@')[0].split(':')[0] + '@s.whatsapp.net'
+  }
 
   function saveContacts() {
-    try { fs.writeFileSync(contactsFile, JSON.stringify(global.db.contacts, null, 2)) } catch {}
+    saveDB()
   }
 
   conn.ev.on('contacts.upsert', (contacts) => {
     let changed = false
     for (const c of contacts) {
       if (!c.id) continue
-      const key = c.id.split('@')[0].split(':')[0] + '@s.whatsapp.net'
+      const key = normalizedId(c.id)
       const name = c.notify || c.name || c.pushName
       if (name && global.db.contacts[key] !== name) {
         global.db.contacts[key] = name
@@ -95,7 +133,7 @@ async function startBot() {
     for (const msg of messages) {
       const raw = msg.key?.participant || msg.key?.remoteJid
       if (!raw || !msg.pushName) continue
-      const key = raw.split('@')[0].split(':')[0] + '@s.whatsapp.net'
+      const key = normalizedId(raw)
       if (global.db.contacts[key] !== msg.pushName) {
         global.db.contacts[key] = msg.pushName
         conn.contacts[key] = { id: key, notify: msg.pushName, name: msg.pushName }
@@ -109,6 +147,11 @@ async function startBot() {
   const getChat = (m) =>
     m?.key?.remoteJid || m?.chat || m?.sender || null
 
+  const getName = (jid) => {
+    const key = normalizedId(jid)
+    return conn.contacts?.[key]?.notify || global.db.contacts?.[key] || key.split('@')[0]
+  }
+
   conn.ev.on('messages.upsert', async ({ messages }) => {
     const m = messages[0]
 
@@ -116,7 +159,67 @@ async function startBot() {
     if (!m?.key?.remoteJid) return
 
     const chat = getChat(m)
-    if (!chat) return   // 🔥 EVITA EL ERROR
+    if (!chat) return
+
+    const isGroup = chat.endsWith('@g.us')
+    const sender = normalizedId(m.key?.participant || m.key?.remoteJid)
+    const botJid = normalizedId(conn.user?.id || conn.user?.jid || '')
+
+    // --- MUTE SYSTEM ---
+    if (isGroup && global.db.data?.muted?.includes(sender) && sender !== botJid) {
+      try {
+        await conn.sendMessage(chat, { delete: m.key })
+      } catch {}
+      return
+    }
+
+    // --- AFK CHECK ---
+    if (isGroup && m.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
+      for (const mentioned of m.message.extendedTextMessage.contextInfo.mentionedJid) {
+        const afkKey = normalizedId(mentioned)
+        const afkData = global.db.data?.afk?.[afkKey]
+        if (afkData) {
+          const elapsed = Math.floor((Date.now() - afkData.since) / 1000)
+          const mins = Math.floor(elapsed / 60)
+          const secs = elapsed % 60
+          const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
+          await conn.sendMessage(chat, {
+            text: `⏰ *${afkData.name}* está AFK desde hace ${timeStr}\n\n📝 Motivo: ${afkData.reason || 'Sin motivo'}`
+          }, { quoted: m })
+          break
+        }
+      }
+    }
+
+    // --- AUTORESPONDER ---
+    if (isGroup) {
+      const textContent =
+        m.message.conversation ||
+        m.message.extendedTextMessage?.text ||
+        ''
+      const autoresponder = global.db.data?.autoresponder || {}
+      for (const [trigger, response] of Object.entries(autoresponder)) {
+        if (textContent.toLowerCase().includes(trigger.toLowerCase())) {
+          await conn.sendMessage(chat, { text: response }, { quoted: m })
+          break
+        }
+      }
+    }
+
+    // --- TAG BOT RESPONSE ---
+    if (m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.some(j => normalizedId(j) === botJid)) {
+      if (sender !== botJid) {
+        const textContent =
+          m.message.conversation ||
+          m.message.extendedTextMessage?.text ||
+          ''
+        const cleanCmd = textContent.replace(/^[.!]+\s*/, '').trim()
+        // Only respond if it's not a command (starts with ! or .)
+        if (!/^[.!]/.test(textContent.trim())) {
+          await conn.sendMessage(chat, { text: 'no estes chingando puta' }, { quoted: m })
+        }
+      }
+    }
 
     const text =
       m.message.conversation ||
@@ -135,6 +238,19 @@ async function startBot() {
     }
 
     const commandName = cmd.replace(/^[.!]/, '')
+
+    // Handle .s alias for sticker
+    if (commandName === 's' || commandName === 'sticker') {
+      try {
+        const mod = await import(`./commands/sticker.js`).catch(() => null)
+        if (mod?.default) {
+          await mod.default(conn, m, cmdArgs, global.db, chat)
+        }
+      } catch (e) {
+        console.log("Error comando:", e)
+      }
+      return
+    }
 
     try {
       const mod = await import(`./commands/${commandName}.js`)
