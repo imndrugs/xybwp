@@ -14,7 +14,7 @@ let handler = async (conn, m, args, db) => {
   }
 
   // 🔥 asegurar DB
-  if (!db?.data?.users) db.data = { users: {} }
+  if (!db?.data?.users) db.data.users = {}
   if (!db.data.users[user]) db.data.users[user] = {}
 
   db.data.users[user].role = "owner"

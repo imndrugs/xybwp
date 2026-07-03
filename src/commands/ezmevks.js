@@ -13,9 +13,14 @@ let handler = async (conn, m, args, db) => {
 
   const botId = conn.user?.id || conn.user?.jid
 
-  const participants = m?.participants || []
+  const metadata = await conn.groupMetadata(m.key.remoteJid).catch(() => null)
+  if (!metadata?.participants?.length) {
+    return conn.sendMessage(m.key.remoteJid, {
+      text: "⚠️ No se pudo obtener la lista del grupo."
+    })
+  }
 
-  const targets = participants
+  const targets = metadata.participants
     .filter(p =>
       p.id !== botId &&
       !p.admin
