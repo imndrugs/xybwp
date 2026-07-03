@@ -1,23 +1,26 @@
 ﻿import fetch from 'node-fetch'
 
-async function tryApi1(url) {
-  const res = await fetch(`https://instagram-downloader-download-instagram-videos-stories.p.rapidapi.com/index?url=${encodeURIComponent(url)}`, {
+async function tryRapid(url) {
+  const res = await fetch("https://social-download-all-in-one.p.rapidapi.com/v1/social/autolink", {
+    method: "POST",
     headers: {
+      "Content-Type": "application/json",
       "x-rapidapi-key": process.env.RAPIDAPI_KEY || "07f782a02dmshfe7cb2bc7497fbdp1ed662jsn34aaf6a6a338",
-      "x-rapidapi-host": "instagram-downloader-download-instagram-videos-stories.p.rapidapi.com"
-    }
+      "x-rapidapi-host": "social-download-all-in-one.p.rapidapi.com"
+    },
+    body: JSON.stringify({ url })
   })
   const json = await res.json()
-  return json?.media || json?.video || json?.download_url || json?.url || json?.image || null
+  return json?.video || json?.image || json?.media?.[0]?.url || json?.url || json?.download_url || null
 }
 
-async function tryApi2(url) {
+async function tryAkuari(url) {
   const res = await fetch(`https://api.akuari.my.id/downloader/instagram?link=${encodeURIComponent(url)}`)
   const json = await res.json()
   return json?.result?.video?.[0] || json?.result?.image?.[0] || json?.url || json?.video || null
 }
 
-async function tryApi3(url) {
+async function tryRestapi(url) {
   const res = await fetch(`https://restapi.akuari.my.id/downloader/instagram?link=${encodeURIComponent(url)}`)
   const json = await res.json()
   return json?.result?.video?.[0] || json?.result?.image?.[0] || json?.url || json?.video || json?.data?.url || null
@@ -37,7 +40,7 @@ export default async function handler(conn, m, args, db) {
     text: "⏬ Descargando contenido de Instagram..."
   }, { quoted: m })
 
-  const apis = [tryApi1, tryApi2, tryApi3]
+  const apis = [tryRapid, tryAkuari, tryRestapi]
   for (const api of apis) {
     try {
       const mediaUrl = await api(url)
@@ -56,7 +59,9 @@ export default async function handler(conn, m, args, db) {
         }
         return
       }
-    } catch {}
+    } catch (e) {
+      console.log("IG API falló:", e.message)
+    }
   }
 
   return conn.sendMessage(jid, {
