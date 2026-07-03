@@ -9,14 +9,10 @@ export default async function handler(conn, m, args, db) {
   }
 
   const botJid = conn.user?.id || conn.user?.jid || ''
-  const botNormalized = botJid.split('@')[0].split(':')[0] + '@s.whatsapp.net'
 
   const participants = groupMetadata.participants || []
   const mentions = participants
-    .filter(p => {
-      const pid = p.id.split('@')[0].split(':')[0] + '@s.whatsapp.net'
-      return pid !== botNormalized
-    })
+    .filter(p => p.id !== botJid)
     .map(p => p.id)
 
   if (!mentions.length) {
@@ -25,16 +21,15 @@ export default async function handler(conn, m, args, db) {
     }, { quoted: m })
   }
 
-  const senderName = db.contacts?.[normalize(m.key?.participant || m.key?.remoteJid)] || m.pushName || 'Alguien'
+  const senderKey = (m.key?.participant || m.key?.remoteJid || '').split('@')[0].split(':')[0] + '@s.whatsapp.net'
+  const senderName = db.contacts?.[senderKey] || m.pushName || senderKey.split('@')[0]
   const count = mentions.length
 
+  const text = `📢 *${senderName}* ha invocado a todos (${count})` + '\n' +
+    mentions.map(jid => `@${jid.split('@')[0]}`).join(' ')
+
   await conn.sendMessage(jid, {
-    text: `📢 *${senderName}* ha invocado a todos (${count})`,
+    text,
     mentions
   }, { quoted: m })
-}
-
-function normalize(jid) {
-  if (!jid) return ''
-  return jid.split('@')[0].split(':')[0] + '@s.whatsapp.net'
 }

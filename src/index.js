@@ -168,8 +168,10 @@ async function startBot() {
     // --- MUTE SYSTEM ---
     if (isGroup && global.db.data?.muted?.includes(sender) && sender !== botJid) {
       try {
-        await conn.sendMessage(chat, { delete: m.key })
-      } catch {}
+        await conn.sendMessage(chat, { delete: { remoteJid: m.key.remoteJid, fromMe: false, id: m.key.id, participant: m.key.participant } })
+      } catch (e) {
+        console.log("Mute delete error:", e)
+      }
       return
     }
 
