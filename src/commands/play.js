@@ -35,6 +35,11 @@ async function searchYT(query) {
   return result.videos?.[0] || null
 }
 
+function jsRuntimeArgs() {
+  // Use node as JS runtime (already installed)
+  return ['--js-runtimes', `node:${process.execPath}`]
+}
+
 async function tryOceansaver(url) {
   try {
     const initResp = await fetch(
@@ -59,75 +64,62 @@ async function tryOceansaver(url) {
 async function downloadAudio(url) {
   const ts = Date.now()
   const hasCookies = existsSync(YT_COOKIE_PATH)
+  const baseArgs = ['--no-playlist', ...jsRuntimeArgs(), '-f', 'bestaudio/best', '--extract-audio', '--audio-format', 'mp3']
 
-  // Strategy 1: Android client — no cookies needed, no JS runtime needed
-  const out1 = join(TEMP_DIR, `play_${ts}.%(ext)s`)
-  try {
-    const args = [
-      '--no-playlist',
-      '--extractor-args', 'youtube:player_client=android',
-      '-f', 'bestaudio/best',
-      '--extract-audio', '--audio-format', 'mp3',
-      '-o', out1, url
-    ]
-    await execFileAsync(YT_DLP, args, { timeout: 120000 })
-    const file = join(TEMP_DIR, `play_${ts}.mp3`)
-    if (existsSync(file) && readFileSync(file).length > 1000) return file
-  } catch {}
-
-  // Strategy 2: Cookies + default client (might warn about JS but try anyway)
+  // Strategy 1: node JS runtime + cookies (if available)
   if (hasCookies) {
-    const out2 = join(TEMP_DIR, `play_${ts}_c.%(ext)s`)
+    const out = join(TEMP_DIR, `play_${ts}_c.%(ext)s`)
     try {
-      await execFileAsync(YT_DLP, [
-        '--no-playlist',
-        '--cookies', YT_COOKIE_PATH,
-        '-f', 'bestaudio/best',
-        '--extract-audio', '--audio-format', 'mp3',
-        '-o', out2, url
-      ], { timeout: 120000 })
+      await execFileAsync(YT_DLP, [...baseArgs, '--cookies', YT_COOKIE_PATH, '-o', out, url], { timeout: 120000 })
       const file = join(TEMP_DIR, `play_${ts}_c.mp3`)
       if (existsSync(file) && readFileSync(file).length > 1000) return file
-    } catch {}
+    } catch (e) { console.log('YT strategy 1 failed:', e.message) }
   }
 
-  throw new Error('No se pudo descargar. YouTube está bloqueando el servidor. Usa .ytcookies para configurar cookies')
+  // Strategy 2: node JS runtime without cookies
+  const out = join(TEMP_DIR, `play_${ts}.%(ext)s`)
+  try {
+    await execFileAsync(YT_DLP, [...baseArgs, '-o', out, url], { timeout: 120000 })
+    const file = join(TEMP_DIR, `play_${ts}.mp3`)
+    if (existsSync(file) && readFileSync(file).length > 1000) return file
+  } catch (e) { console.log('YT strategy 2 failed:', e.message) }
+
+  // Strategy 3: android client (no JS runtime needed)
+  try {
+    const out3 = join(TEMP_DIR, `play_${ts}_a.%(ext)s`)
+    await execFileAsync(YT_DLP, [
+      '--no-playlist',
+      '--extractor-args', 'youtube:player_client=android',
+      '-f', 'bestaudio/best', '--extract-audio', '--audio-format', 'mp3',
+      '-o', out3, url
+    ], { timeout: 120000 })
+    const file = join(TEMP_DIR, `play_${ts}_a.mp3`)
+    if (existsSync(file) && readFileSync(file).length > 1000) return file
+  } catch (e) { console.log('YT strategy 3 failed:', e.message) }
+
+  throw new Error('YouTube bloqueó la descarga. Configura cookies con .ytcookies')
 }
 
 async function downloadVideo(url) {
   const ts = Date.now()
   const hasCookies = existsSync(YT_COOKIE_PATH)
+  const baseArgs = ['--no-playlist', ...jsRuntimeArgs(), '-f', 'best[ext=mp4]/best', '--merge-output-format', 'mp4']
 
-  // Strategy 1: Android
-  const out1 = join(TEMP_DIR, `play_v_${ts}.%(ext)s`)
-  try {
-    await execFileAsync(YT_DLP, [
-      '--no-playlist',
-      '--extractor-args', 'youtube:player_client=android',
-      '-f', 'best[ext=mp4]/best',
-      '--merge-output-format', 'mp4',
-      '-o', out1, url
-    ], { timeout: 180000 })
-    const file = join(TEMP_DIR, `play_v_${ts}.mp4`)
-    if (existsSync(file) && readFileSync(file).length > 1000) return file
-  } catch {}
-
-  // Strategy 2: Cookies
   if (hasCookies) {
-    const out2 = join(TEMP_DIR, `play_v_${ts}_c.%(ext)s`)
+    const out = join(TEMP_DIR, `play_v_${ts}_c.%(ext)s`)
     try {
-      const args = [
-        '--no-playlist',
-        '-f', 'best[ext=mp4]/best',
-        '--merge-output-format', 'mp4',
-        '-o', out2, url
-      ]
-      if (hasCookies) args.push('--cookies', YT_COOKIE_PATH)
-      await execFileAsync(YT_DLP, args, { timeout: 180000 })
+      await execFileAsync(YT_DLP, [...baseArgs, '--cookies', YT_COOKIE_PATH, '-o', out, url], { timeout: 180000 })
       const file = join(TEMP_DIR, `play_v_${ts}_c.mp4`)
       if (existsSync(file) && readFileSync(file).length > 1000) return file
     } catch {}
   }
+
+  const out = join(TEMP_DIR, `play_v_${ts}.%(ext)s`)
+  try {
+    await execFileAsync(YT_DLP, [...baseArgs, '-o', out, url], { timeout: 180000 })
+    const file = join(TEMP_DIR, `play_v_${ts}.mp4`)
+    if (existsSync(file) && readFileSync(file).length > 1000) return file
+  } catch {}
 
   throw new Error('No se pudo descargar el video')
 }
@@ -172,7 +164,6 @@ export default async function handler(conn, m, args, db) {
 
     let sent = false
 
-    // Try oceansaver first (no cookies/JS needed)
     const dlUrl = await tryOceansaver(video.url)
     if (dlUrl) {
       try {
@@ -182,12 +173,9 @@ export default async function handler(conn, m, args, db) {
           fileName: `${video.title}.mp3`
         }, { quoted: m })
         sent = true
-      } catch (e) {
-        console.log('Oceansaver send error:', e.message)
-      }
+      } catch {}
     }
 
-    // Fallback to yt-dlp
     if (!sent) {
       const filePath = await downloadAudio(video.url)
       const buf = readFileSync(filePath)
@@ -197,7 +185,6 @@ export default async function handler(conn, m, args, db) {
         fileName: `${video.title}.mp3`
       }, { quoted: m })
       try { unlinkSync(filePath) } catch {}
-      sent = true
     }
   } catch (e) {
     console.error(e)
