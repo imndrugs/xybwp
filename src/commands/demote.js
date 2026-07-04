@@ -17,30 +17,35 @@ export default async function handler(conn, m, args, db) {
   const botJid = clean(conn.user?.jid || conn.user?.id || '')
   const botParticipant = groupMetadata.participants.find(p => clean(p.id) === botJid)
   if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
-    return conn.sendMessage(jid, { text: '❌ El bot debe ser admin del grupo para promover' }, { quoted: m })
+    return conn.sendMessage(jid, { text: '❌ El bot debe ser admin del grupo para despromover' }, { quoted: m })
   }
 
   const ctx = m.message?.extendedTextMessage?.contextInfo
   const target = ctx?.mentionedJid?.[0] || ctx?.participant || null
 
   if (!target) {
-    return conn.sendMessage(jid, { text: '⚠️ Menciona o responde al mensaje de un usuario para promoverlo' }, { quoted: m })
+    return conn.sendMessage(jid, { text: '⚠️ Menciona o responde al mensaje de un usuario para quitarle el admin' }, { quoted: m })
   }
 
   const targetClean = clean(target)
-  const isAlreadyAdmin = groupMetadata.participants.some(p => clean(p.id) === targetClean && (p.admin === 'admin' || p.admin === 'superadmin'))
-  if (isAlreadyAdmin) {
-    return conn.sendMessage(jid, { text: 'ℹ️ Este usuario ya es admin del grupo' }, { quoted: m })
+  const isGroupOwner = groupMetadata.owner && clean(groupMetadata.owner) === targetClean
+  if (isGroupOwner) {
+    return conn.sendMessage(jid, { text: '❌ No puedo quitar admin al dueño del grupo' }, { quoted: m })
+  }
+
+  const isAdmin = groupMetadata.participants.some(p => clean(p.id) === targetClean && (p.admin === 'admin' || p.admin === 'superadmin'))
+  if (!isAdmin) {
+    return conn.sendMessage(jid, { text: 'ℹ️ Este usuario no es admin del grupo' }, { quoted: m })
   }
 
   try {
-    await conn.groupParticipantsUpdate(jid, [target], 'promote')
+    await conn.groupParticipantsUpdate(jid, [target], 'demote')
     const name = db.contacts?.[targetClean + '@s.whatsapp.net'] || targetClean
-    await conn.sendMessage(jid, { text: `⭐ *${name}* ahora es admin del grupo` }, { quoted: m })
+    await conn.sendMessage(jid, { text: `⬇️ *${name}* ya no es admin del grupo` }, { quoted: m })
   } catch (e) {
-    console.error('Error promoting:', e)
+    console.error('Error demoting:', e)
     await conn.sendMessage(jid, {
-      text: `❌ No pude promover a @${targetClean}\nAsegúrate de que el bot sea admin`,
+      text: `❌ No pude quitar admin a @${targetClean}\nAsegúrate de que el bot sea admin`,
       mentions: [target]
     }, { quoted: m })
   }
