@@ -14,8 +14,9 @@ export default async function handler(conn, m, args, db) {
     return conn.sendMessage(jid, { text: '⚠️ Solo funciona en grupos' }, { quoted: m })
   }
 
-  const botJid = clean(conn.user?.jid || conn.user?.id || '')
-  const botParticipant = groupMetadata.participants.find(p => clean(p.id) === botJid)
+  const rawBotId = conn.user?.jid || conn.user?.id || ''
+  const botNumber = typeof rawBotId === 'object' ? (rawBotId.user || '') : String(rawBotId).split('@')[0].split(':')[0]
+  const botParticipant = groupMetadata.participants.find(p => p.id.split('@')[0].split(':')[0] === botNumber)
   if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
     return conn.sendMessage(jid, { text: '❌ El bot debe ser admin del grupo para promover' }, { quoted: m })
   }
