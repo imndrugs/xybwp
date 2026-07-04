@@ -6,7 +6,7 @@ export default async function handler(conn, m, args, db) {
 
   if (!isOwner(sender) && !isAdmin(sender, db)) {
     return conn.sendMessage(jid, {
-      text: '🚫 Solo admins y owners pueden banear usuarios'
+      text: '🚫 Solo admins y owners pueden desbanear usuarios'
     }, { quoted: m })
   }
 
@@ -15,36 +15,21 @@ export default async function handler(conn, m, args, db) {
 
   if (!target) {
     return conn.sendMessage(jid, {
-      text: '⚠️ Menciona a alguien o responde a su mensaje\nUso: .ban @usuario [motivo]'
+      text: '⚠️ Menciona a alguien o responde a su mensaje\nUso: .unban @usuario'
     }, { quoted: m })
   }
 
   const cleanTarget = clean(target)
-  const cleanSender = clean(sender)
-
-  if (cleanTarget === cleanSender) {
-    return conn.sendMessage(jid, {
-      text: '⚠️ No puedes banearte a ti mismo'
-    }, { quoted: m })
-  }
-
-  if (isOwner(target)) {
-    return conn.sendMessage(jid, {
-      text: '👑 No puedes banear a un owner'
-    }, { quoted: m })
-  }
 
   if (!db.data.banned) db.data.banned = []
 
-  if (db.data.banned.includes(cleanTarget)) {
+  if (!db.data.banned.includes(cleanTarget)) {
     return conn.sendMessage(jid, {
-      text: 'ℹ️ Este usuario ya está baneado'
+      text: 'ℹ️ Este usuario no está baneado'
     }, { quoted: m })
   }
 
-  const motivo = args.slice(1).join(' ') || 'Sin motivo'
-
-  db.data.banned.push(cleanTarget)
+  db.data.banned = db.data.banned.filter(id => id !== cleanTarget)
 
   try {
     const fs = await import('fs')
@@ -54,13 +39,13 @@ export default async function handler(conn, m, args, db) {
     raw.data.banned = db.data.banned
     fs.writeFileSync(dataFile, JSON.stringify(raw, null, 2))
   } catch (e) {
-    console.error('Error guardando ban:', e)
+    console.error('Error guardando unban:', e)
   }
 
   const mentionJid = target.includes('@') ? target : cleanTarget + '@s.whatsapp.net'
   const name = db.contacts?.[mentionJid] || conn.contacts?.[mentionJid]?.notify || cleanTarget
 
   await conn.sendMessage(jid, {
-    text: `🚫 *${name}* baneado del bot\n📝 Motivo: ${motivo}\n\nYa no podrá usar comandos.`
+    text: `✅ *${name}* desbaneado\n\nYa puede usar el bot normalmente.`
   }, { quoted: m })
 }

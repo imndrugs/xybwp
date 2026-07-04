@@ -1,4 +1,4 @@
-// 👑 PON TU OWNER AQUÍ (SIN @lid, SOLO NÚMEROS)
+﻿// 👑 PON TU OWNER AQUÍ (SIN @lid, SOLO NÚMEROS)
 // También puedes definirlo con OWNER_ID=numero1,numero2 al iniciar el bot.
 const OWNER_IDS_RAW = (process.env.OWNER_ID || "116715954372809").split(",")
 
@@ -16,7 +16,6 @@ export function clean(jid = "") {
     value = value.slice(1)
   }
 
-  // quitar sufijos tipo @lid, @s.whatsapp.net, @g.us, etc.
   value = value.split("@")[0]
   value = value.replace(/:\d+/g, "")
   value = value.replace(/\D/g, "")
@@ -53,10 +52,6 @@ export function isOwner(jid = "") {
   const ids = collectCandidateIds(jid)
   const normalizedIds = ids.filter(Boolean)
 
-  console.log("RAW:", jid)
-  console.log("CLEAN:", normalizedIds)
-  console.log("OWNER:", OWNER_IDS)
-
   if (!normalizedIds.length || !OWNER_IDS.length) return false
 
   return normalizedIds.some((id) =>
@@ -70,6 +65,20 @@ export function isOwner(jid = "") {
       )
     })
   )
+}
+
+// 🛡️ CHECK ADMIN
+export function isAdmin(sender, db) {
+  if (!sender || !db?.data?.admins) return false
+  const cleanSender = clean(sender)
+  return db.data.admins.some(admin => clean(admin) === cleanSender)
+}
+
+// 🛡️ CHECK BANNED
+export function isBanned(sender, db) {
+  if (!sender || !db?.data?.banned) return false
+  const cleanSender = clean(sender)
+  return db.data.banned.some(bannedId => clean(bannedId) === cleanSender)
 }
 
 export function getSenderId(m = {}) {
@@ -100,4 +109,5 @@ export function getSenderId(m = {}) {
 export function initDB(db) {
   if (!db?.data) db.data = {}
   if (!db.data.admins) db.data.admins = []
+  if (!db.data.banned) db.data.banned = []
 }

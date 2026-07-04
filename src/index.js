@@ -1,4 +1,4 @@
-function getJid(m) {
+﻿function getJid(m) {
     return m?.key?.remoteJid || m?.chat || m?.sender || ""
 }
 
@@ -32,6 +32,7 @@ async function startBot() {
   data: {
     admins: [],
     muted: [],
+    banned: [],
     autoresponder: {},
     afk: {},
     antivirgenes: []
@@ -83,6 +84,7 @@ async function startBot() {
           if (parsed.data.admins) global.db.data.admins = parsed.data.admins
           if (parsed.data.muted) global.db.data.muted = parsed.data.muted
           if (parsed.data.antivirgenes) global.db.data.antivirgenes = parsed.data.antivirgenes
+        if (parsed.data.banned) global.db.data.banned = parsed.data.banned
           if (parsed.data.autoresponder) {
             const ar = parsed.data.autoresponder
             if (typeof ar[Object.keys(ar)[0]] === 'string') {
@@ -105,6 +107,7 @@ async function startBot() {
           admins: global.db.data?.admins || [],
           muted: global.db.data?.muted || [],
           antivirgenes: global.db.data?.antivirgenes || [],
+          banned: global.db.data?.banned || [],
           autoresponder: global.db.data?.autoresponder || {},
           afk: global.db.data?.afk || {}
         }
@@ -117,6 +120,7 @@ async function startBot() {
   if (!conn.contacts) conn.contacts = {}
   if (!global.db.data) global.db.data = {}
   if (!global.db.data.muted) global.db.data.muted = []
+  if (!global.db.data.banned) global.db.data.banned = []
   if (!global.db.data.antivirgenes) global.db.data.antivirgenes = []
   if (!global.db.data.autoresponder) global.db.data.autoresponder = {}
   if (!global.db.data.afk) global.db.data.afk = {}
@@ -253,6 +257,11 @@ async function startBot() {
       } catch (e) {
         console.log("Mute delete error:", e)
       }
+      return
+    }
+
+    // --- BANNED CHECK: ignorar silenciosamente a usuarios baneados ---
+    if (global.db.data?.banned?.includes(sender) && sender !== botJid) {
       return
     }
 
