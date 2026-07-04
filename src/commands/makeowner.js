@@ -1,4 +1,4 @@
-import { isOwner, getSenderId, clean } from '../lib/perms.js'
+import { isOwner, getSenderId, clean, OWNER_IDS } from '../lib/perms.js'
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
@@ -20,17 +20,16 @@ export default async function handler(conn, m, args, db) {
 
   const targetClean = clean(target)
 
-  if (!global.db.data.admins) global.db.data.admins = []
-  if (global.db.data.admins.includes(targetClean)) {
+  if (OWNER_IDS.includes(targetClean)) {
     return conn.sendMessage(jid, {
-      text: '⚠️ Ese usuario ya es admin'
+      text: '⚠️ Ese usuario ya es owner'
     }, { quoted: m })
   }
 
-  global.db.data.admins.push(targetClean)
+  OWNER_IDS.push(targetClean)
 
   return conn.sendMessage(jid, {
-    text: `✅ @${targetClean} agregado como admin del bot`,
+    text: `✅ @${targetClean} ahora es owner`,
     mentions: [target]
   }, { quoted: m })
 }
