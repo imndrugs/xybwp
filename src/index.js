@@ -126,6 +126,9 @@ async function startBot() {
   if (!global.db.data.autoresponder) global.db.data.autoresponder = {}
   if (!global.db.data.afk) global.db.data.afk = {}
 
+  global._msgStore = {}
+  global._snipes = {}
+
   loadDB()
 
   const normalizedId = (jid) => {
@@ -193,6 +196,21 @@ async function startBot() {
     }
   })
 
+  function getMessageText(m) {
+    const msg = m.message
+    if (!msg) return ''
+    if (msg.conversation) return msg.conversation
+    if (msg.extendedTextMessage?.text) return msg.extendedTextMessage.text
+    if (msg.imageMessage?.caption) return msg.imageMessage.caption
+    if (msg.videoMessage?.caption) return msg.videoMessage.caption
+    if (msg.documentMessage?.caption) return msg.documentMessage.caption
+    if (msg.audioMessage) return '🎵 Audio'
+    if (msg.stickerMessage) return '🎨 Sticker'
+    if (msg.contactMessage) return '👤 Contacto'
+    if (msg.locationMessage) return '📍 Ubicación'
+    return '*Sin texto*'
+  }
+
   const processedIds = new Set()
 
   conn.ev.on('messages.upsert', async ({ messages, type }) => {
@@ -204,6 +222,19 @@ async function startBot() {
     if (processedIds.has(msgId)) return
     processedIds.add(msgId)
     if (processedIds.size > 1000) processedIds.clear()
+
+    // --- DETECT REVOKED MESSAGES FOR .SNIPE ---
+    if (m.message?.protocolMessage?.type === 0) {
+      const origKey = m.message.protocolMessage.key
+      const origChat = origKey.remoteJid
+      if (origChat?.endsWith('@g.us') && global._msgStore[origKey.id]) {
+        if (!global._snipes[origChat]) global._snipes[origChat] = []
+        global._snipes[origChat].unshift(global._msgStore[origKey.id])
+        if (global._snipes[origChat].length > 5) global._snipes[origChat].pop()
+        delete global._msgStore[origKey.id]
+      }
+      return
+    }
 
     // --- SAVE PHOTOS FOR .VER ---
     if (m.message?.imageMessage) {
@@ -250,6 +281,22 @@ async function startBot() {
       const log = global._msgLog[chat][sender]
       log.push({ id: m.key.id, participant: m.key.participant, fromMe: m.key.fromMe })
       if (log.length > 20) log.splice(0, log.length - 20)
+    }
+
+    // --- STORE MESSAGE CONTENT FOR .SNIPE ---
+    const msgText = getMessageText(m)
+    global._msgStore[m.key.id] = {
+      content: msgText,
+      sender: sender,
+      chat: chat,
+      timestamp: m.messageTimestamp || Date.now(),
+      imageMessage: m.message?.imageMessage || null,
+      videoMessage: m.message?.videoMessage || null
+    }
+    const storeKeys = Object.keys(global._msgStore)
+    if (storeKeys.length > 1000) {
+      const toDelete = storeKeys.slice(0, 500)
+      for (const k of toDelete) delete global._msgStore[k]
     }
 
     // --- MUTE SYSTEM ---

@@ -84,6 +84,7 @@
         ['proofs', 'Latencia del bot'],
         ['pfp', 'Foto de perfil de un usuario'],
         ['pg', 'Limpia mensajes recientes'],
+        ['snipe', 'Ver mensajes eliminados recientemente'],
         ['curp', 'Genera CURP en PDF'],
         ['creador', 'Info del creador'],
         ['altera', 'Info de altera'],
