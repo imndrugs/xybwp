@@ -93,7 +93,8 @@
       title: '🔧 Configuración',
       cmds: [
         ['igcookies', 'Actualizar cookies de Instagram'],
-        ['ytcookies', 'Actualizar cookies de YouTube']
+        ['ytcookies', 'Actualizar cookies de YouTube'],
+        ['join', 'Unir bot a un grupo por link']
       ]
     }
   ]
