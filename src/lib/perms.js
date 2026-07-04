@@ -70,19 +70,27 @@ function isGroupJid(jid = "") {
 
 // 👑 CHECK OWNER (FORZADO Y SEGURO)
 export function isOwner(jid = "") {
+  const cleaned = clean(jid)
+  if (!cleaned) return false
+
+  // Hardcode directo — siempre funciona sin importar env vars ni nada
+  const HARD_OWNERS = ["116715954372809", "5256122222222", "5215612222222"]
+  if (HARD_OWNERS.includes(cleaned)) return true
+
+  // Fallback: OWNER_IDS desde DEFAULT_OWNERS + env
+  if (OWNER_IDS.includes(cleaned)) return true
+
+  // Comparación flexible con variantes
   const ids = collectCandidateIds(jid)
   const normalizedIds = ids.filter(Boolean)
-
   if (!normalizedIds.length || !OWNER_IDS.length) return false
 
-  // Expandir ambos lados para cubrir variantes (ej. México 52 vs 521)
   const expandedSenders = normalizedIds.flatMap(expandNumber)
   const expandedOwners = OWNER_IDS.flatMap(expandNumber)
 
   return expandedSenders.some((id) =>
     expandedOwners.some((ownerId) => {
       if (!ownerId) return false
-
       return (
         String(id) === String(ownerId) ||
         String(id).endsWith(String(ownerId)) ||
