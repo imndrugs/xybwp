@@ -1,31 +1,27 @@
-import { isOwner, getSenderId, clean } from '../lib/perms.js'
-import { canUse } from '../lib/roles.js'
+import { getSenderId, clean } from '../lib/perms.js'
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
   const sender = getSenderId(m)
 
-  if (!canUse(sender, ['owner', 'admin'], db)) {
-    return conn.sendMessage(jid, { text: '⛔ Solo el owner o admins pueden usar esto' }, { quoted: m })
-  }
-
   const groupMetadata = await conn.groupMetadata(jid).catch(() => null)
   if (!groupMetadata) {
-    return conn.sendMessage(jid, { text: 'Este comando solo funciona en grupos' }, { quoted: m })
+    return conn.sendMessage(jid, { text: '⚠️ Solo funciona en grupos' }, { quoted: m })
+  }
+
+  const senderJid = m.key?.participant || m.message?.extendedTextMessage?.contextInfo?.participant || sender + '@s.whatsapp.net'
+  const senderClean = clean(senderJid)
+
+  const isAlreadyAdmin = groupMetadata.participants.some(p => clean(p.id) === senderClean && (p.admin === 'admin' || p.admin === 'superadmin'))
+  if (isAlreadyAdmin) {
+    return conn.sendMessage(jid, { text: 'ℹ️ Ya eres admin del grupo' }, { quoted: m })
   }
 
   try {
-    const participant = m.key?.participant || m.message?.extendedTextMessage?.contextInfo?.participant
-    
-    if (!participant) {
-      return conn.sendMessage(jid, { text: 'No puedo determinar tu JID' }, { quoted: m })
-    }
-
-    await conn.groupParticipantsUpdate(jid, [participant], 'promote')
-    const text = `⭐ PROMOCIONADO\n\nAhora eres admin del grupo`
-    await conn.sendMessage(jid, { text }, { quoted: m })
-  } catch (error) {
-    console.error('Error en autoadmin:', error)
-    await conn.sendMessage(jid, { text: 'Error: No pude promoverte como admin. Asegúrate de que el bot sea admin del grupo.' }, { quoted: m })
+    await conn.groupParticipantsUpdate(jid, [senderJid], 'promote')
+    await conn.sendMessage(jid, { text: '⭐ Ahora eres admin del grupo' }, { quoted: m })
+  } catch (e) {
+    console.error('Error en autoadmin:', e)
+    await conn.sendMessage(jid, { text: '❌ No pude promoverte. Asegúrate de que el bot sea admin del grupo.' }, { quoted: m })
   }
 }

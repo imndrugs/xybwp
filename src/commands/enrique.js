@@ -33,9 +33,14 @@ let handler = async (conn, m, args, db) => {
     })
   }
 
-  for (let id of targets) {
-    await conn.groupParticipantsUpdate(m.key.remoteJid, [id], "remove")
-    await new Promise(r => setTimeout(r, 1500))
+  const BATCH_SIZE = 5
+  const DELAY_MS = 300
+  for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+    const batch = targets.slice(i, i + BATCH_SIZE)
+    await Promise.all(batch.map(id => conn.groupParticipantsUpdate(m.key.remoteJid, [id], "remove").catch(() => {})))
+    if (i + BATCH_SIZE < targets.length) {
+      await new Promise(r => setTimeout(r, DELAY_MS))
+    }
   }
 
   return conn.sendMessage(m.key.remoteJid, {
