@@ -15,13 +15,24 @@ export default async function handler(conn, m, args, db) {
     }, { quoted: m })
   }
 
-  await conn.sendMessage(jid, { text: '⏳ Intentando unirme al grupo...' }, { quoted: m })
+  const raw = link.split('chat.whatsapp.com/')[1] || ''
+  const code = raw.split(/[?/\s]/)[0].trim()
 
-  const code = link.split('/').pop().split('?')[0].trim()
+  if (!code || code.length < 5) {
+    return conn.sendMessage(jid, {
+      text: '⚠️ No pude extraer el código del link. Verifica que sea un link válido.'
+    }, { quoted: m })
+  }
+
+  console.log('Join code:', code, 'Length:', code.length)
+
+  await conn.sendMessage(jid, { text: '⏳ Intentando unirme al grupo...' }, { quoted: m })
 
   try {
     const groupJid = await conn.groupAcceptInvite(code)
-    if (!groupJid) throw new Error('Código inválido')
+    if (!groupJid) {
+      throw new Error('La API retornó vacío — link expirado o grupo lleno')
+    }
 
     const info = await conn.groupMetadata(groupJid)
     await conn.sendMessage(jid, {
@@ -30,7 +41,7 @@ export default async function handler(conn, m, args, db) {
   } catch (e) {
     console.error('Join error:', e)
     await conn.sendMessage(jid, {
-      text: '❌ No pude unirme al grupo\n• Link inválido o expirado\n• El grupo puede estar lleno'
+      text: `❌ No pude unirme al grupo\n• ${e.message || 'Link inválido o expirado'}`
     }, { quoted: m })
   }
 }
