@@ -37,7 +37,7 @@ async function searchYT(query) {
 
 // -- TRY VARIOUS YOUTUBE DOWNLOAD APIS --
 const DOWNLOAD_APIS = [
-  // SocialKit (tiene API key configurada en Railway)
+  // 1) SocialKit (tiene API key en Railway)
   async (videoId) => {
     const key = process.env.SOCIALKIT_KEY
     if (!key) return null
@@ -45,11 +45,7 @@ const DOWNLOAD_APIS = [
       const r = await fetch('https://api.socialkit.dev/youtube/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          access_key: key,
-          url: `https://youtube.com/watch?v=${videoId}`,
-          format: 'mp3'
-        }),
+        body: JSON.stringify({ access_key: key, url: `https://youtube.com/watch?v=${videoId}`, format: 'mp3' }),
         signal: AbortSignal.timeout(30000)
       })
       if (!r.ok) return null
@@ -58,7 +54,31 @@ const DOWNLOAD_APIS = [
     } catch (e) { console.log('SocialKit error:', e.message); return null }
   },
 
-  // Oceansaver
+  // 2) yt2mp3converter.net (free, unlimited, returns JSON con download URL)
+  async (videoId) => {
+    try {
+      const r = await fetch(`https://www.yt2mp3converter.net/apis/fetch.php?url=https://youtube.com/watch?v=${videoId}&format=mp3`, {
+        signal: AbortSignal.timeout(20000)
+      })
+      if (!r.ok) return null
+      const d = await r.json()
+      return d?.download || null
+    } catch (e) { console.log('yt2mp3 error:', e.message); return null }
+  },
+
+  // 3) Vevioz API (free REST, devuelve redirect a descarga)
+  async (videoId) => {
+    try {
+      const r = await fetch(`https://api.vevioz.com/api/single/mp3?url=https://youtube.com/watch?v=${videoId}`, {
+        signal: AbortSignal.timeout(30000),
+        redirect: 'manual'
+      })
+      if (r.status >= 300 && r.status < 400) return r.headers.get('location')
+      return null
+    } catch (e) { console.log('Vevioz error:', e.message); return null }
+  },
+
+  // 4) Oceansaver (fallback lejano)
   async (videoId, fullUrl) => {
     try {
       const r = await fetch(
@@ -77,17 +97,6 @@ const DOWNLOAD_APIS = [
       }
     } catch { return null }
     return null
-  },
-
-  // mateusishiyama API (repl)
-  async (videoId) => {
-    try {
-      const r = await fetch(`https://youtube-download-api.matheusishiyama.repl.co/mp3/?url=https://youtube.com/watch?v=${videoId}`, {
-        signal: AbortSignal.timeout(20000)
-      })
-      if (!r.ok || !r.headers.get('content-type')?.includes('audio')) return null
-      return r.url
-    } catch { return null }
   },
 ]
 
@@ -168,7 +177,7 @@ export default async function handler(conn, m, args, db) {
     // Try each download API in order
     let sent = false
     let lastApiError = ''
-    const apiNames = ['SocialKit', 'Oceansaver', 'mateusishiyama']
+    const apiNames = ['SocialKit', 'yt2mp3converter', 'Vevioz', 'Oceansaver']
     for (let i = 0; i < DOWNLOAD_APIS.length; i++) {
       try {
         const dlUrl = await DOWNLOAD_APIS[i](videoId, video.url)
