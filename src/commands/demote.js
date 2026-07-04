@@ -5,13 +5,16 @@ export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
   const sender = getSenderId(m)
 
-  if (!canUse(sender, ['owner', 'admin'], db)) {
-    return conn.sendMessage(jid, { text: '⛔ Solo owners o admins pueden usar este comando' }, { quoted: m })
-  }
-
   const groupMetadata = await conn.groupMetadata(jid).catch(() => null)
   if (!groupMetadata) {
     return conn.sendMessage(jid, { text: '⚠️ Solo funciona en grupos' }, { quoted: m })
+  }
+
+  const participant = groupMetadata.participants.find(p => clean(p.id) === sender)
+  const isGroupAdmin = participant && (participant.admin === 'admin' || participant.admin === 'superadmin')
+
+  if (!canUse(sender, ['owner', 'admin'], db) && !isGroupAdmin) {
+    return conn.sendMessage(jid, { text: '⛔ Solo owners, admins del bot o admins del grupo pueden usar este comando' }, { quoted: m })
   }
 
   const ctx = m.message?.extendedTextMessage?.contextInfo
