@@ -80,6 +80,9 @@ export function isOwner(jid = "") {
   // Fallback: OWNER_IDS desde DEFAULT_OWNERS + env
   if (OWNER_IDS.includes(cleaned)) return true
 
+  // Owners añadidos dinámicamente vía .makeowner
+  if (global._extraOwners?.includes(cleaned)) return true
+
   // Comparación flexible con variantes
   const ids = collectCandidateIds(jid)
   const normalizedIds = ids.filter(Boolean)

@@ -1,4 +1,4 @@
-import { isOwner, getSenderId, clean, OWNER_IDS } from '../lib/perms.js'
+import { isOwner, getSenderId, clean } from '../lib/perms.js'
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
@@ -20,13 +20,15 @@ export default async function handler(conn, m, args, db) {
 
   const targetClean = clean(target)
 
-  if (OWNER_IDS.includes(targetClean)) {
+  if (!global._extraOwners) global._extraOwners = []
+
+  if (isOwner(targetClean) || global._extraOwners.includes(targetClean)) {
     return conn.sendMessage(jid, {
       text: '⚠️ Ese usuario ya es owner'
     }, { quoted: m })
   }
 
-  OWNER_IDS.push(targetClean)
+  global._extraOwners.push(targetClean)
 
   return conn.sendMessage(jid, {
     text: `✅ @${targetClean} ahora es owner`,

@@ -113,6 +113,7 @@ async function startBot() {
 
   global._msgStore = {}
   global._snipes = {}
+  global._extraOwners = []
 
   loadDB()
 
