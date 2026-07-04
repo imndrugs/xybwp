@@ -13,6 +13,7 @@ import dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
+import { isBanned } from './lib/perms.js'
 
 dotenv.config()
 
@@ -261,7 +262,7 @@ async function startBot() {
     }
 
     // --- BANNED CHECK: ignorar silenciosamente a usuarios baneados ---
-    if (global.db.data?.banned?.includes(sender) && sender !== botJid) {
+    if (isBanned(sender, global.db) && sender !== botJid) {
       return
     }
 
