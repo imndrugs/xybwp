@@ -1,16 +1,6 @@
 import { canUse } from '../lib/roles.js'
 import { getSenderId, clean } from '../lib/perms.js'
 
-function getBotNumber(conn) {
-  const raw = conn.user?.jid || conn.user?.id || ''
-  if (typeof raw === 'object') {
-    if (raw.remoteJid) return String(raw.remoteJid).split('@')[0].split(':')[0]
-    if (raw.user) return String(raw.user)
-    return ''
-  }
-  return String(raw).split('@')[0].split(':')[0]
-}
-
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
   const sender = getSenderId(m)
@@ -22,17 +12,6 @@ export default async function handler(conn, m, args, db) {
   const groupMetadata = await conn.groupMetadata(jid).catch(() => null)
   if (!groupMetadata) {
     return conn.sendMessage(jid, { text: '⚠️ Solo funciona en grupos' }, { quoted: m })
-  }
-
-  const botNumber = getBotNumber(conn)
-  const botParticipant = groupMetadata.participants.find(p => {
-    const pNum = p.id.split('@')[0].split(':')[0]
-    return pNum === botNumber
-  })
-
-  if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
-    console.log('[DEMOTE] Bot not admin. botNumber:', botNumber, 'participants:', groupMetadata.participants.map(p => p.id.split('@')[0]))
-    return conn.sendMessage(jid, { text: '❌ El bot debe ser admin del grupo para despromover' }, { quoted: m })
   }
 
   const ctx = m.message?.extendedTextMessage?.contextInfo
@@ -60,7 +39,7 @@ export default async function handler(conn, m, args, db) {
   } catch (e) {
     console.error('Error demoting:', e)
     await conn.sendMessage(jid, {
-      text: `❌ No pude quitar admin a @${targetClean}\nAsegúrate de que el bot sea admin`,
+      text: `❌ No pude quitar admin a @${targetClean}\nAsegúrate de que el bot sea admin del grupo`,
       mentions: [target]
     }, { quoted: m })
   }

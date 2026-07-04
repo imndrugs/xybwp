@@ -1,19 +1,10 @@
 import fs from 'fs'
 import path from 'path'
-import { getSenderId } from '../lib/perms.js'
-import { canUse } from '../lib/roles.js'
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
   if (!jid.endsWith('@g.us')) {
     return conn.sendMessage(jid, { text: '⚠️ Este comando solo funciona en grupos' }, { quoted: m })
-  }
-
-  const sender = getSenderId(m)
-  if (!canUse(sender, ['owner', 'admin'], db)) {
-    return conn.sendMessage(jid, {
-      text: '⛔ Solo el owner o admins pueden usar este comando'
-    }, { quoted: m })
   }
 
   if (!db.data.antivirgenes) db.data.antivirgenes = []
