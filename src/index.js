@@ -217,11 +217,33 @@ async function startBot() {
       if (!key?.id || !key?.remoteJid) continue
       if (update?.messageStubType === 25) {
         const chat = key.remoteJid
-        if (!chat.endsWith('@g.us') || !global._msgStore[key.id]) continue
-        if (!global._snipes[chat]) global._snipes[chat] = []
-        global._snipes[chat].unshift(global._msgStore[key.id])
-        if (global._snipes[chat].length > 5) global._snipes[chat].pop()
-        delete global._msgStore[key.id]
+        if (!chat.endsWith('@g.us')) continue
+        // Try by original message ID
+        if (global._msgStore[key.id]) {
+          if (!global._snipes[chat]) global._snipes[chat] = []
+          global._snipes[chat].unshift(global._msgStore[key.id])
+          if (global._snipes[chat].length > 5) global._snipes[chat].pop()
+          delete global._msgStore[key.id]
+        } else {
+          // Fallback: find NEWEST by participant
+          const deletedUser = normalizedId(key.participant)
+          if (deletedUser) {
+            let foundKey = null
+            let foundTs = 0
+            for (const [msgId, msg] of Object.entries(global._msgStore)) {
+              if (msg.chat === chat && msg.sender === deletedUser && (msg.timestamp || 0) >= foundTs) {
+                foundKey = msgId
+                foundTs = msg.timestamp || 0
+              }
+            }
+            if (foundKey) {
+              if (!global._snipes[chat]) global._snipes[chat] = []
+              global._snipes[chat].unshift(global._msgStore[foundKey])
+              if (global._snipes[chat].length > 5) global._snipes[chat].pop()
+              delete global._msgStore[foundKey]
+            }
+          }
+        }
       }
     }
   })
@@ -282,11 +304,34 @@ async function startBot() {
     // --- DETECT REVOKED MESSAGES VIA STUB TYPE ---
     if (m.messageStubType === 25) {
       const chat = m.key.remoteJid
-      if (chat?.endsWith('@g.us') && global._msgStore[m.key.id]) {
-        if (!global._snipes[chat]) global._snipes[chat] = []
-        global._snipes[chat].unshift(global._msgStore[m.key.id])
-        if (global._snipes[chat].length > 5) global._snipes[chat].pop()
-        delete global._msgStore[m.key.id]
+      if (chat?.endsWith('@g.us')) {
+        // Try by system message ID (protocolMessage case)
+        if (global._msgStore[m.key.id]) {
+          if (!global._snipes[chat]) global._snipes[chat] = []
+          global._snipes[chat].unshift(global._msgStore[m.key.id])
+          if (global._snipes[chat].length > 5) global._snipes[chat].pop()
+          delete global._msgStore[m.key.id]
+        } else {
+          // Admin deleted someone else's msg — find NEWEST by sender from stub parameters
+          const params = m.messageStubParameters || []
+          const deletedUser = params.length > 0 ? normalizedId(params[0]) : null
+          if (deletedUser) {
+            let foundKey = null
+            let foundTs = 0
+            for (const [msgId, msg] of Object.entries(global._msgStore)) {
+              if (msg.chat === chat && msg.sender === deletedUser && (msg.timestamp || 0) >= foundTs) {
+                foundKey = msgId
+                foundTs = msg.timestamp || 0
+              }
+            }
+            if (foundKey) {
+              if (!global._snipes[chat]) global._snipes[chat] = []
+              global._snipes[chat].unshift(global._msgStore[foundKey])
+              if (global._snipes[chat].length > 5) global._snipes[chat].pop()
+              delete global._msgStore[foundKey]
+            }
+          }
+        }
       }
       return
     }
