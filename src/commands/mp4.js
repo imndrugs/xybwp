@@ -1,8 +1,10 @@
 import { downloadMediaMessage } from '@whiskeysockets/baileys'
 import { execSync } from 'child_process'
 import { tmpdir } from 'os'
-import { writeFileSync, unlinkSync, readFileSync, existsSync } from 'fs'
+import { writeFileSync, unlinkSync, readFileSync, existsSync, mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
+import webpmux from 'node-webpmux'
+const { Image } = webpmux
 
 export default async function handler(conn, m) {
   const jid = m.chat || m.key?.remoteJid || ''
@@ -17,54 +19,61 @@ export default async function handler(conn, m) {
   try {
     const mediaMsg = { message: { stickerMessage: quotedMsg.stickerMessage } }
     const buffer = await downloadMediaMessage(mediaMsg, 'buffer', {})
-
     if (!buffer || buffer.length < 50) throw new Error('Sticker vacío o corrupto')
 
     const ts = Date.now()
-    const tmpInput = join(tmpdir(), `${ts}.webp`)
-    const tmpOutput = join(tmpdir(), `${ts}.mp4`)
-    writeFileSync(tmpInput, buffer)
+    const tmpDir = join(tmpdir(), `mp4_${ts}`)
+    mkdirSync(tmpDir, { recursive: true })
 
-    let info = ''
-    try {
-      info = execSync(
-        `ffprobe -v error -show_entries format=format_name:stream=codec_name,width,height -of csv=p=0 "${tmpInput}"`,
-        { timeout: 5000, encoding: 'utf8' }
-      ).trim()
-    } catch {}
+    const img = new Image()
+    await img.load(buffer)
 
-    const cmds = [
-      `ffmpeg -y -c:v libwebp -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`,
-      `ffmpeg -y -c:v libwebp_anim -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`,
-      `ffmpeg -y -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`,
-      `ffmpeg -y -i "${tmpInput}" -c:v h264 -pix_fmt yuv420p -an "${tmpOutput}"`,
-      `ffmpeg -y -i "${tmpInput}" -an "${tmpOutput}"`,
-    ]
+    if (!img.loaded) throw new Error('No se pudo cargar el WebP')
 
-    let ok = false
-    let lastErr = ''
-    for (const cmd of cmds) {
-      try {
-        execSync(cmd, { timeout: 60000, stdio: 'pipe' })
-        if (existsSync(tmpOutput) && readFileSync(tmpOutput).length > 200) { ok = true; break }
-      } catch (e) {
-        const stderr = e.stderr?.toString() || ''
-        const errLine = stderr.split('\n').filter(l => l.includes('Error'))[0]
-        lastErr = (errLine || e.message)?.trim()
-      }
+    let frames = []
+    if (img.hasAnim) {
+      const rawFrames = await img.demux({ buffers: true })
+      frames = rawFrames.map((buf, i) => ({
+        buffer: buf,
+        delay: (img.frames[i]?.delay || 100) / 1000
+      }))
+    } else {
+      frames = [{ buffer, delay: 0.1 }]
     }
 
-    if (!ok) {
-      const debug = info ? ` (ffprobe: ${info})` : ' (sin info)'
-      const size = ` (${buffer.length} bytes)`
-      throw new Error(`${lastErr}${debug}${size}`)
+    const frameFiles = []
+    for (let i = 0; i < frames.length; i++) {
+      const webpPath = join(tmpDir, `f_${String(i).padStart(3, '0')}.webp`)
+      const pngPath = join(tmpDir, `f_${String(i).padStart(3, '0')}.png`)
+      writeFileSync(webpPath, frames[i].buffer)
+      execSync(`ffmpeg -y -i "${webpPath}" "${pngPath}"`, { timeout: 15000, stdio: 'pipe' })
+      frameFiles.push(pngPath)
+    }
+
+    // Calculate framerate from delays
+    const avgDelay = frames.reduce((a, f) => a + f.delay, 0) / frames.length
+    const fps = Math.round(1 / avgDelay)
+
+    const tmpOutput = join(tmpdir(), `${ts}.mp4`)
+    const inputPattern = join(tmpDir, 'f_%03d.png')
+    execSync(`ffmpeg -y -framerate ${fps} -i "${inputPattern}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`, { timeout: 60000, stdio: 'pipe' })
+
+    if (!existsSync(tmpOutput) || readFileSync(tmpOutput).length < 200) {
+      throw new Error('El MP4 generado está vacío')
     }
 
     const mp4Buffer = readFileSync(tmpOutput)
     await conn.sendMessage(jid, { video: mp4Buffer, caption: 'Sticker animado convertido' }, { quoted: m })
 
-    try { unlinkSync(tmpInput) } catch {}
-    try { unlinkSync(tmpOutput) } catch {}
+    // Cleanup
+    try {
+      for (const f of [...frameFiles, ...frameFiles.map(p => p.replace('.png', '.webp'))]) {
+        try { unlinkSync(f) } catch {}
+      }
+      unlinkSync(tmpOutput)
+      try { rmSync(tmpDir, { recursive: true }) } catch {}
+    } catch {}
+
   } catch (e) {
     console.error(e)
     await conn.sendMessage(jid, { text: `No pude convertir el sticker: ${e.message}` }, { quoted: m })
