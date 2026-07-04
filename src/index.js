@@ -279,6 +279,18 @@ async function startBot() {
       return
     }
 
+    // --- DETECT REVOKED MESSAGES VIA STUB TYPE ---
+    if (m.messageStubType === 25) {
+      const chat = m.key.remoteJid
+      if (chat?.endsWith('@g.us') && global._msgStore[m.key.id]) {
+        if (!global._snipes[chat]) global._snipes[chat] = []
+        global._snipes[chat].unshift(global._msgStore[m.key.id])
+        if (global._snipes[chat].length > 5) global._snipes[chat].pop()
+        delete global._msgStore[m.key.id]
+      }
+      return
+    }
+
     if (!m?.message) return
 
     const chat = getChat(m)

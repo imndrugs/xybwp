@@ -1,6 +1,18 @@
 import { getSenderId, clean } from '../lib/perms.js'
 import { canUse } from '../lib/roles.js'
 
+function normalize(jid) {
+  if (!jid) return ''
+  return jid.split('@')[0].split(':')[0] + '@s.whatsapp.net'
+}
+
+function getName(conn, db, jid) {
+  const key = normalize(jid)
+  const contact = conn.contacts?.[key]
+  if (contact) return contact.notify || contact.name || contact.pushName || null
+  return db?.contacts?.[key] || null
+}
+
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
   const sender = getSenderId(m)
@@ -23,7 +35,7 @@ export default async function handler(conn, m, args, db) {
     const text = msg.content
       ? (msg.content.length > 60 ? msg.content.slice(0, 60) + '...' : msg.content)
       : '*Sin texto*'
-    const name = (db.contacts?.[msg.sender + '@s.whatsapp.net'] || msg.sender).substring(0, 12)
+    const name = getName(conn, db, msg.sender) || msg.sender.substring(0, 12)
     const hasImage = msg.imageMessage ? ' 📷' : ''
     return `\`${i + 1}\` │ ${name} │ ${text} │ ${time}${hasImage}`
   }).join('\n')
