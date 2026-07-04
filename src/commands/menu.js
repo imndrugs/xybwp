@@ -85,6 +85,7 @@
         ['pfp', 'Foto de perfil de un usuario'],
         ['pg', 'Limpia mensajes recientes'],
         ['snipe', 'Ver mensajes eliminados recientemente'],
+        ['id', 'Ver el JID de un usuario'],
         ['curp', 'Genera CURP en PDF'],
         ['creador', 'Info del creador'],
         ['altera', 'Info de altera'],
