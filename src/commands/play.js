@@ -167,20 +167,27 @@ export default async function handler(conn, m, args, db) {
 
     // Try each download API in order
     let sent = false
-    for (const apiFn of DOWNLOAD_APIS) {
+    let lastApiError = ''
+    const apiNames = ['SocialKit', 'Oceansaver', 'mateusishiyama']
+    for (let i = 0; i < DOWNLOAD_APIS.length; i++) {
       try {
-        const dlUrl = await apiFn(videoId, video.url)
-        if (!dlUrl) continue
-        // Send audio directly from URL
+        const dlUrl = await DOWNLOAD_APIS[i](videoId, video.url)
+        if (!dlUrl) { lastApiError += `${apiNames[i] || i}: no URL, `; continue }
+        // Download the file ourselves and send as buffer (more reliable)
+        const fileResp = await fetch(dlUrl, { signal: AbortSignal.timeout(60000) })
+        if (!fileResp.ok) { lastApiError += `${apiNames[i] || i}: HTTP ${fileResp.status}, `; continue }
+        const audioBuf = Buffer.from(await fileResp.arrayBuffer())
+        if (audioBuf.length < 1000) { lastApiError += `${apiNames[i] || i}: empty (${audioBuf.length}b), `; continue }
         await conn.sendMessage(jid, {
-          audio: { url: dlUrl },
+          audio: audioBuf,
           mimetype: 'audio/mpeg',
           fileName: `${video.title}.mp3`
         }, { quoted: m })
         sent = true
         break
-      } catch {}
+      } catch (e) { lastApiError += `${apiNames[i] || i}: ${e.message}, ` }
     }
+    if (!sent) console.log('API errors:', lastApiError)
 
     // Fallback: download via yt-dlp and send as buffer
     if (!sent) {
