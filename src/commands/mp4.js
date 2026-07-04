@@ -1,4 +1,4 @@
-import { downloadContentFromMessage } from '@whiskeysockets/baileys'
+import { downloadMediaMessage } from '@whiskeysockets/baileys'
 import { execSync } from 'child_process'
 import { tmpdir } from 'os'
 import { writeFileSync, unlinkSync, readFileSync, existsSync } from 'fs'
@@ -15,32 +15,29 @@ export default async function handler(conn, m) {
   }
 
   try {
-    const stream = await downloadContentFromMessage(quotedMsg.stickerMessage, 'sticker')
-    const chunks = []
-    for await (const chunk of stream) chunks.push(chunk)
-    const buffer = Buffer.concat(chunks)
+    const mediaMsg = { message: { stickerMessage: quotedMsg.stickerMessage } }
+    const buffer = await downloadMediaMessage(mediaMsg, 'buffer', {})
+
+    if (!buffer || buffer.length < 50) throw new Error('Sticker vacío o corrupto')
 
     const ts = Date.now()
     const tmpInput = join(tmpdir(), `${ts}.webp`)
     const tmpOutput = join(tmpdir(), `${ts}.mp4`)
     writeFileSync(tmpInput, buffer)
 
-    // Debug: check file
     let info = ''
     try {
-      info = execSync(`ffprobe -v error -show_entries format=format_name:stream=codec_name -of csv=p=0 "${tmpInput}"`, { timeout: 5000, encoding: 'utf8' }).trim()
+      info = execSync(
+        `ffprobe -v error -show_entries format=format_name:stream=codec_name,width,height -of csv=p=0 "${tmpInput}"`,
+        { timeout: 5000, encoding: 'utf8' }
+      ).trim()
     } catch {}
 
     const cmds = [
-      // Decode with explicit libwebp, encode with libx264
       `ffmpeg -y -c:v libwebp -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`,
-      // With libwebp_anim decoder (for animated webp)
       `ffmpeg -y -c:v libwebp_anim -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`,
-      // One-step conversion
+      `ffmpeg -y -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`,
       `ffmpeg -y -i "${tmpInput}" -c:v h264 -pix_fmt yuv420p -an "${tmpOutput}"`,
-      // Raw conversion, no pixel format
-      `ffmpeg -y -i "${tmpInput}" -c:v libx264 -an "${tmpOutput}"`,
-      // Last resort
       `ffmpeg -y -i "${tmpInput}" -an "${tmpOutput}"`,
     ]
 
@@ -52,14 +49,15 @@ export default async function handler(conn, m) {
         if (existsSync(tmpOutput) && readFileSync(tmpOutput).length > 200) { ok = true; break }
       } catch (e) {
         const stderr = e.stderr?.toString() || ''
-        const lines = stderr.split('\n').filter(l => l.includes('Error'))
-        lastErr = (lines[0] || e.message)?.trim()
+        const errLine = stderr.split('\n').filter(l => l.includes('Error'))[0]
+        lastErr = (errLine || e.message)?.trim()
       }
     }
 
     if (!ok) {
-      const debug = info ? ` (ffprobe: ${info})` : ''
-      throw new Error(`${lastErr}${debug}`)
+      const debug = info ? ` (ffprobe: ${info})` : ' (sin info)'
+      const size = ` (${buffer.length} bytes)`
+      throw new Error(`${lastErr}${debug}${size}`)
     }
 
     const mp4Buffer = readFileSync(tmpOutput)
