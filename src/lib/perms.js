@@ -1,6 +1,6 @@
 ﻿// 👑 PON TU OWNER AQUÍ (SIN @lid, SOLO NÚMEROS)
 // También puedes definirlo con OWNER_ID=numero1,numero2 al iniciar el bot.
-const OWNER_IDS_RAW = (process.env.OWNER_ID || "116715954372809").split(",")
+const OWNER_IDS_RAW = (process.env.OWNER_ID || "116715954372809,5256122222222").split(",")
 
 export const OWNER_IDS = OWNER_IDS_RAW.map((id) => clean(id)).filter(Boolean)
 
