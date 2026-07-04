@@ -351,7 +351,11 @@ async function startBot() {
 
     if (!text) return
 
-    const args = text.trim().split(/ +/)
+    const trimmed = text.trim()
+    const hasPrefix = /^[.!]/.test(trimmed) || /^xyb\b/i.test(trimmed)
+    if (!hasPrefix) return
+
+    const args = trimmed.split(/ +/)
     let cmd = args[0].toLowerCase()
     let cmdArgs = args.slice(1)
 
