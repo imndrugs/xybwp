@@ -25,15 +25,22 @@ export default async function handler(conn, m) {
     const tmpOutput = join(tmpdir(), `${ts}.mp4`)
     writeFileSync(tmpInput, buffer)
 
-    // Try multiple conversion approaches
+    // Debug: check file
+    let info = ''
+    try {
+      info = execSync(`ffprobe -v error -show_entries format=format_name:stream=codec_name -of csv=p=0 "${tmpInput}"`, { timeout: 5000, encoding: 'utf8' }).trim()
+    } catch {}
+
     const cmds = [
-      // 1) Simplest possible
-      `ffmpeg -y -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`,
-      // 2) Without pixel format
-      `ffmpeg -y -i "${tmpInput}" -c:v h264 -an "${tmpOutput}"`,
-      // 3) With webp decoder explicitly + no extra flags
-      `ffmpeg -y -c:v libwebp_anim -i "${tmpInput}" -c:v libx264 -an "${tmpOutput}"`,
-      // 4) Copy stream approach
+      // Decode with explicit libwebp, encode with libx264
+      `ffmpeg -y -c:v libwebp -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`,
+      // With libwebp_anim decoder (for animated webp)
+      `ffmpeg -y -c:v libwebp_anim -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`,
+      // One-step conversion
+      `ffmpeg -y -i "${tmpInput}" -c:v h264 -pix_fmt yuv420p -an "${tmpOutput}"`,
+      // Raw conversion, no pixel format
+      `ffmpeg -y -i "${tmpInput}" -c:v libx264 -an "${tmpOutput}"`,
+      // Last resort
       `ffmpeg -y -i "${tmpInput}" -an "${tmpOutput}"`,
     ]
 
@@ -44,11 +51,16 @@ export default async function handler(conn, m) {
         execSync(cmd, { timeout: 60000, stdio: 'pipe' })
         if (existsSync(tmpOutput) && readFileSync(tmpOutput).length > 200) { ok = true; break }
       } catch (e) {
-        lastErr = (e.stderr?.toString()?.split('\n')?.filter(l => l.includes('Error'))[0] || e.message)?.trim()
+        const stderr = e.stderr?.toString() || ''
+        const lines = stderr.split('\n').filter(l => l.includes('Error'))
+        lastErr = (lines[0] || e.message)?.trim()
       }
     }
 
-    if (!ok) throw new Error(lastErr)
+    if (!ok) {
+      const debug = info ? ` (ffprobe: ${info})` : ''
+      throw new Error(`${lastErr}${debug}`)
+    }
 
     const mp4Buffer = readFileSync(tmpOutput)
     await conn.sendMessage(jid, { video: mp4Buffer, caption: 'Sticker animado convertido' }, { quoted: m })
