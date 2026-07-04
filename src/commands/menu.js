@@ -1,4 +1,4 @@
-export default async function handler(conn, m, args, db) {
+﻿export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
 
   const groupMetadata = await conn.groupMetadata(jid).catch(() => null)
@@ -36,13 +36,15 @@ export default async function handler(conn, m, args, db) {
     {
       title: '⚙️ ADMINISTRACION',
       cmds: [
-        ['Kick', 'Expulsa a un miembro'],
-        ['ban', 'Expulsar a un miembro'],
+        ['kick', 'Expulsa a un miembro'],
+        ['ban', 'Banear usuario del bot'],
+        ['unban', 'Desbanear usuario del bot'],
         ['sacar', 'Expulsa a un miembro'],
         ['escupir', 'Escupe a alguien'],
         ['ezmevks', 'Elimina a todos los no admins'],
         ['setadmin', 'Da rol de admin en el bot'],
         ['deladmin', 'Quita rol de admin en el bot'],
+        ['makeowner', 'Dar rol de owner'],
         ['autoadmin', 'Admin automático al entrar'],
         ['admin', 'Muestra admins del bot'],
         ['link', 'Link de invitación del grupo'],
@@ -64,11 +66,14 @@ export default async function handler(conn, m, args, db) {
       cmds: [
         ['tt / tiktok', 'Descarga videos de tiktok'],
         ['ig / instagram', 'Descarga videos de ig'],
+        ['play', 'Reproduce música de YouTube'],
+        ['music', 'Busca y reproduce música'],
         ['sticker', 'Crea sticker'],
-        ['wm', 'Crea sticker con marca de agua / Robar stickers'],
+        ['wm', 'Crea sticker con marca de agua'],
         ['brat', 'Sticker con texto personalizado'],
         ['img', 'Sticker a imagen'],
-        ['mp4', 'Sticker animado a video']
+        ['mp4', 'Sticker animado a video'],
+        ['ver', 'Ver foto guardada del chat']
       ]
     },
     {
@@ -82,6 +87,13 @@ export default async function handler(conn, m, args, db) {
         ['creador', 'Info del creador'],
         ['altera', 'Info de altera'],
         ['menu', 'Este menú']
+      ]
+    },
+    {
+      title: '🔧 Configuración',
+      cmds: [
+        ['igcookies', 'Actualizar cookies de Instagram'],
+        ['ytcookies', 'Actualizar cookies de YouTube']
       ]
     }
   ]

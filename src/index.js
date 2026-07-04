@@ -239,6 +239,7 @@ async function startBot() {
     if (!chat) return
 
     const isGroup = chat.endsWith('@g.us')
+    if (!isGroup) return
     const sender = normalizedId(m.key?.participant || m.key?.remoteJid)
     const botJid = normalizedId(conn.user?.id || conn.user?.jid || '')
 
