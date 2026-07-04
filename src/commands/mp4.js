@@ -20,24 +20,41 @@ export default async function handler(conn, m) {
     for await (const chunk of stream) chunks.push(chunk)
     const buffer = Buffer.concat(chunks)
 
-    const tmpInput = join(tmpdir(), `${Date.now()}.webp`)
-    const tmpOutput = join(tmpdir(), `${Date.now()}.mp4`)
+    const ts = Date.now()
+    const tmpInput = join(tmpdir(), `${ts}.webp`)
+    const tmpOutput = join(tmpdir(), `${ts}.mp4`)
     writeFileSync(tmpInput, buffer)
 
-    const encoders = ['libx264', 'h264', 'libx264rgb', 'mpeg4']
+    // Check if webp is valid
+    const fileSize = buffer.length
+    if (fileSize < 50) throw new Error('Sticker vacío o corrupto')
+
+    // Strategies for webp → mp4 conversion
+    const strategies = [
+      // 1) Native h264 + handle transparency with white bg
+      `ffmpeg -y -i "${tmpInput}" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p" -c:v h264 -an "${tmpOutput}"`,
+      // 2) libx264 + transparency fix
+      `ffmpeg -y -i "${tmpInput}" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p" -c:v libx264 -an "${tmpOutput}"`,
+      // 3) With libx264rgb
+      `ffmpeg -y -i "${tmpInput}" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264rgb -an "${tmpOutput}"`,
+      // 4) Simple conversion (let ffmpeg decide)
+      `ffmpeg -y -i "${tmpInput}" -an "${tmpOutput}"`,
+    ]
+
     let ok = false
-    for (const enc of encoders) {
+    let lastErr = ''
+    for (const cmd of strategies) {
       try {
-        execSync(
-          `ffmpeg -y -i "${tmpInput}" -c:v ${enc} -pix_fmt yuv420p -an "${tmpOutput}"`,
-          { timeout: 30000, stdio: 'pipe' }
-        )
-        if (readFileSync(tmpOutput).length > 100) { ok = true; break }
-      } catch {}
+        execSync(cmd, { timeout: 30000, stdio: 'pipe' })
+        const outSize = readFileSync(tmpOutput).length
+        if (outSize > 200) { ok = true; break }
+      } catch (e) {
+        lastErr = e.stderr?.toString().split('\n').slice(-3).join(' ').trim() || e.message
+      }
     }
 
     if (!ok) {
-      throw new Error('No se pudo codificar el video con ningun encoder')
+      throw new Error(`ffmpeg: ${lastErr || 'todos los métodos fallaron'}`)
     }
 
     const mp4Buffer = readFileSync(tmpOutput)
