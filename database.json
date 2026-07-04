@@ -78,19 +78,11 @@
     "89451669811439@s.whatsapp.net": "Lorena"
   },
   "data": {
-    "admins": [
-      "145600079204504",
-      "274491527700623"
-    ],
+    "admins": [],
     "muted": [],
-    "antivirgenes": [
-      "120363407668618463@g.us"
-    ],
-    "autoresponder": {
-      "global": {
-        "ezme": "Marca📞🔥"
-      }
-    },
+    "banned": [],
+    "antivirgenes": [],
+    "autoresponder": {},
     "afk": {}
   }
 }

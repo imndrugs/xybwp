@@ -81,21 +81,6 @@ async function startBot() {
       const parsed = JSON.parse(raw)
       if (parsed) {
         if (parsed.contacts) global.db.contacts = parsed.contacts
-        if (parsed.data) {
-          if (parsed.data.admins) global.db.data.admins = parsed.data.admins
-          if (parsed.data.muted) global.db.data.muted = parsed.data.muted
-          if (parsed.data.antivirgenes) global.db.data.antivirgenes = parsed.data.antivirgenes
-        if (parsed.data.banned) global.db.data.banned = parsed.data.banned
-          if (parsed.data.autoresponder) {
-            const ar = parsed.data.autoresponder
-            if (typeof ar[Object.keys(ar)[0]] === 'string') {
-              global.db.data.autoresponder = { global: { ...ar } }
-            } else {
-              global.db.data.autoresponder = ar
-            }
-          }
-          if (parsed.data.afk) global.db.data.afk = parsed.data.afk
-        }
       }
     } catch {}
   }
