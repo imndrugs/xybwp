@@ -4,7 +4,12 @@ const DEFAULT_OWNERS = ["116715954372809", "5256122222222"]
 const ENV_OWNERS = process.env.OWNER_ID ? process.env.OWNER_ID.split(",") : []
 const OWNER_IDS_RAW = [...new Set([...DEFAULT_OWNERS, ...ENV_OWNERS])]
 
-export const OWNER_IDS = OWNER_IDS_RAW.map((id) => clean(id)).filter(Boolean)
+export let OWNER_IDS = []
+
+function rebuildOwnerIds() {
+  OWNER_IDS = [...new Set(OWNER_IDS_RAW.map((id) => clean(id)).filter(Boolean))]
+}
+rebuildOwnerIds()
 
 // 🧠 limpia cualquier formato de WhatsApp
 export function clean(jid = "") {
@@ -23,6 +28,20 @@ export function clean(jid = "") {
   value = value.replace(/\D/g, "")
 
   return value
+}
+
+// Genera variantes del número para comparación flexible
+function expandNumber(num) {
+  const variants = [num]
+  // México: si empieza con 52, probar con/sin 1 después de 52
+  if (num.startsWith("52") && num.length >= 12) {
+    if (num[2] !== "1") {
+      variants.push("52" + "1" + num.slice(2))
+    } else {
+      variants.push("52" + num.slice(3))
+    }
+  }
+  return variants
 }
 
 function collectCandidateIds(value) {
@@ -56,8 +75,12 @@ export function isOwner(jid = "") {
 
   if (!normalizedIds.length || !OWNER_IDS.length) return false
 
-  return normalizedIds.some((id) =>
-    OWNER_IDS.some((ownerId) => {
+  // Expandir ambos lados para cubrir variantes (ej. México 52 vs 521)
+  const expandedSenders = normalizedIds.flatMap(expandNumber)
+  const expandedOwners = OWNER_IDS.flatMap(expandNumber)
+
+  return expandedSenders.some((id) =>
+    expandedOwners.some((ownerId) => {
       if (!ownerId) return false
 
       return (
