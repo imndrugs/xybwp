@@ -1,7 +1,7 @@
 import { downloadContentFromMessage } from '@whiskeysockets/baileys'
 import { execSync } from 'child_process'
 import { tmpdir } from 'os'
-import { writeFileSync, unlinkSync, readFileSync } from 'fs'
+import { writeFileSync, unlinkSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
 export default async function handler(conn, m) {
@@ -25,37 +25,30 @@ export default async function handler(conn, m) {
     const tmpOutput = join(tmpdir(), `${ts}.mp4`)
     writeFileSync(tmpInput, buffer)
 
-    // Check if webp is valid
-    const fileSize = buffer.length
-    if (fileSize < 50) throw new Error('Sticker vacío o corrupto')
-
-    // Strategies for webp → mp4 conversion
-    const strategies = [
-      // 1) Native h264 + handle transparency with white bg
-      `ffmpeg -y -i "${tmpInput}" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p" -c:v h264 -an "${tmpOutput}"`,
-      // 2) libx264 + transparency fix
-      `ffmpeg -y -i "${tmpInput}" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p" -c:v libx264 -an "${tmpOutput}"`,
-      // 3) With libx264rgb
-      `ffmpeg -y -i "${tmpInput}" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264rgb -an "${tmpOutput}"`,
-      // 4) Simple conversion (let ffmpeg decide)
+    // Try multiple conversion approaches
+    const cmds = [
+      // 1) Simplest possible
+      `ffmpeg -y -i "${tmpInput}" -c:v libx264 -pix_fmt yuv420p -an "${tmpOutput}"`,
+      // 2) Without pixel format
+      `ffmpeg -y -i "${tmpInput}" -c:v h264 -an "${tmpOutput}"`,
+      // 3) With webp decoder explicitly + no extra flags
+      `ffmpeg -y -c:v libwebp_anim -i "${tmpInput}" -c:v libx264 -an "${tmpOutput}"`,
+      // 4) Copy stream approach
       `ffmpeg -y -i "${tmpInput}" -an "${tmpOutput}"`,
     ]
 
     let ok = false
     let lastErr = ''
-    for (const cmd of strategies) {
+    for (const cmd of cmds) {
       try {
-        execSync(cmd, { timeout: 30000, stdio: 'pipe' })
-        const outSize = readFileSync(tmpOutput).length
-        if (outSize > 200) { ok = true; break }
+        execSync(cmd, { timeout: 60000, stdio: 'pipe' })
+        if (existsSync(tmpOutput) && readFileSync(tmpOutput).length > 200) { ok = true; break }
       } catch (e) {
-        lastErr = e.stderr?.toString().split('\n').slice(-3).join(' ').trim() || e.message
+        lastErr = (e.stderr?.toString()?.split('\n')?.filter(l => l.includes('Error'))[0] || e.message)?.trim()
       }
     }
 
-    if (!ok) {
-      throw new Error(`ffmpeg: ${lastErr || 'todos los métodos fallaron'}`)
-    }
+    if (!ok) throw new Error(lastErr)
 
     const mp4Buffer = readFileSync(tmpOutput)
     await conn.sendMessage(jid, { video: mp4Buffer, caption: 'Sticker animado convertido' }, { quoted: m })
