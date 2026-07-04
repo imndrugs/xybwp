@@ -1,11 +1,20 @@
 import { canUse } from '../lib/roles.js'
-import { getSenderId, clean, OWNER_IDS } from '../lib/perms.js'
+import { getSenderId, clean, OWNER_IDS, isOwner } from '../lib/perms.js'
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
-  const sender = getSenderId(m)
 
-  console.log('[PROMOTE] sender:', sender, 'OWNER_IDS:', OWNER_IDS)
+  console.log('[PROMOTE] ===== DEBUG ====')
+  console.log('[PROMOTE] m.key.participant:', m.key?.participant)
+  console.log('[PROMOTE] m.key.remoteJid:', m.key?.remoteJid)
+  console.log('[PROMOTE] m.sender:', m.sender)
+
+  const sender = getSenderId(m)
+  console.log('[PROMOTE] getSenderId result:', sender)
+  console.log('[PROMOTE] OWNER_IDS array:', OWNER_IDS)
+  console.log('[PROMOTE] isOwner(sender):', isOwner(sender))
+  console.log('[PROMOTE] canUse(sender, [owner, admin], db):', canUse(sender, ['owner', 'admin'], db))
+  console.log('[PROMOTE] ===== END DEBUG ====')
 
   if (!canUse(sender, ['owner', 'admin'], db)) {
     return conn.sendMessage(jid, { text: '⛔ Solo owners o admins pueden usar este comando' }, { quoted: m })

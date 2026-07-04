@@ -1,4 +1,5 @@
-import { isOwner, getSenderId } from '../lib/perms.js'
+import { getSenderId, clean } from '../lib/perms.js'
+import { canUse } from '../lib/roles.js'
 import fs from 'fs'
 import path from 'path'
 
@@ -6,9 +7,18 @@ export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
   const sender = getSenderId(m)
 
-  if (!isOwner(sender)) {
+  // Owner, bot-admin, o WhatsApp group admin pueden usar unmute
+  const groupMetadata = await conn.groupMetadata(jid).catch(() => null)
+  if (!groupMetadata) {
+    return conn.sendMessage(jid, { text: '⚠️ Solo funciona en grupos' }, { quoted: m })
+  }
+
+  const senderParticipant = groupMetadata.participants.find(p => clean(p.id) === sender)
+  const isGroupAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin')
+
+  if (!canUse(sender, ['owner', 'admin'], db) && !isGroupAdmin) {
     return conn.sendMessage(jid, {
-      text: '⛔ Solo el OWNER puede usar este comando'
+      text: '⛔ Solo el owner, admins del bot, o admins del grupo pueden usar este comando'
     }, { quoted: m })
   }
 
