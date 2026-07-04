@@ -211,6 +211,21 @@ async function startBot() {
     return '*Sin texto*'
   }
 
+  // --- DETECT DELETIONS VIA messages.update ---
+  conn.ev.on('messages.update', (updates) => {
+    for (const { key, update } of updates) {
+      if (!key?.id || !key?.remoteJid) continue
+      if (update?.messageStubType === 25) {
+        const chat = key.remoteJid
+        if (!chat.endsWith('@g.us') || !global._msgStore[key.id]) continue
+        if (!global._snipes[chat]) global._snipes[chat] = []
+        global._snipes[chat].unshift(global._msgStore[key.id])
+        if (global._snipes[chat].length > 5) global._snipes[chat].pop()
+        delete global._msgStore[key.id]
+      }
+    }
+  })
+
   const processedIds = new Set()
 
   conn.ev.on('messages.upsert', async ({ messages, type }) => {

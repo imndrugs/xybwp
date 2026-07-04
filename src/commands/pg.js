@@ -27,6 +27,18 @@ export default async function handler(conn, m, args, db) {
   }
 
   const toDelete = keys.splice(-10)
+
+  // Before deleting, move messages to _snipes
+  if (!global._snipes) global._snipes = {}
+  for (const k of toDelete) {
+    if (global._msgStore?.[k.id]) {
+      if (!global._snipes[chat]) global._snipes[chat] = []
+      global._snipes[chat].unshift(global._msgStore[k.id])
+      if (global._snipes[chat].length > 5) global._snipes[chat].pop()
+      delete global._msgStore[k.id]
+    }
+  }
+
   let deleted = 0
 
   for (const k of toDelete) {
