@@ -1,32 +1,36 @@
-import { normalize } from "../lib/roles.js"
+import { isOwner, getSenderId, clean } from '../lib/perms.js'
 
-const OWNER_NUMBER = "525644444644@s.whatsapp.net" // 👈 TU NUMERO
+export default async function handler(conn, m, args, db) {
+  const jid = m.chat || m.key?.remoteJid || ''
+  const sender = getSenderId(m)
 
-let handler = async (conn, m, args, db) => {
-
-  const user = normalize(m.sender)
-
-  // 🔒 BLOQUEO TOTAL
-  if (user !== OWNER_NUMBER) {
-    return conn.sendMessage(m.key.remoteJid, {
-      text: "🔒 Este comando está bloqueado."
-    })
+  if (!isOwner(sender)) {
+    return conn.sendMessage(jid, {
+      text: '🔒 Solo el owner puede usar este comando'
+    }, { quoted: m })
   }
 
-  // 🔥 asegurar DB
-  if (!db?.data?.users) db.data.users = {}
-  if (!db.data.users[user]) db.data.users[user] = {}
+  const ctx = m.message?.extendedTextMessage?.contextInfo
+  let target = ctx?.mentionedJid?.[0] || ctx?.participant || null
+  if (!target) {
+    return conn.sendMessage(jid, {
+      text: '⚠️ Menciona o responde al usuario que quieres hacer owner'
+    }, { quoted: m })
+  }
 
-  db.data.users[user].role = "owner"
+  const targetClean = clean(target)
 
-  const text = `👑 PERMISOS ASIGNADOS\n\nStatus: OWNER`
+  if (!global.db.data.admins) global.db.data.admins = []
+  if (global.db.data.admins.includes(targetClean)) {
+    return conn.sendMessage(jid, {
+      text: '⚠️ Ese usuario ya es admin'
+    }, { quoted: m })
+  }
 
-  return conn.sendMessage(m.key.remoteJid, {
-    text
-  })
+  global.db.data.admins.push(targetClean)
+
+  return conn.sendMessage(jid, {
+    text: `✅ @${targetClean} agregado como admin del bot`,
+    mentions: [target]
+  }, { quoted: m })
 }
-
-handler.command = ["makeowner"]
-handler.group = false
-
-export default handler
