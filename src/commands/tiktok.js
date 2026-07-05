@@ -19,7 +19,6 @@ async function resolveUrl(shortUrl) {
 }
 
 function cleanTikTokUrl(url) {
-  // Quitar parametros de tracking (?_r=1&_t=...)
   const idx = url.indexOf('?')
   if (idx !== -1) url = url.substring(0, idx)
   return url
@@ -56,6 +55,65 @@ function findFile(prefix, exts) {
   return null
 }
 
+// ---- Scraper directo de la pagina de TikTok (fotos) ----
+async function scrapeTikTokPage(url) {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      signal: AbortSignal.timeout(15000)
+    })
+    if (!res.ok) { console.log("Scraper HTTP", res.status); return null }
+    const html = await res.text()
+
+    // Buscar JSON en <script id="__NEXT_DATA__">
+    const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/)
+    const stateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});/);
+    const rawJson = nextMatch?.[1] || stateMatch?.[1]
+    if (!rawJson) { console.log("Scraper: no se encontro JSON en pagina"); return null }
+
+    let data
+    try { data = JSON.parse(rawJson) } catch { console.log("Scraper: JSON invalido"); return null }
+
+    // Navegar por la estructura del JSON de TikTok
+    const videoData =
+      data?.props?.pageProps?.videoData ||
+      data?.props?.pageProps?.itemInfo?.itemStruct ||
+      data?.__INITIAL_STATE__?.videoData ||
+      data
+
+    const images = []
+    if (videoData?.imagePost?.images) {
+      for (const img of videoData.imagePost.images) {
+        const u = img?.imageURL?.urlList?.[0] || img?.imageURL || ''
+        if (u) images.push(u)
+      }
+    }
+    // Fallback: buscar displaySrc/imageSrc en el JSON
+    if (!images.length) {
+      const all = JSON.stringify(data)
+      const regex = /"displaySrc"\s*:\s*"([^"]+)"/g
+      let m
+      while ((m = regex.exec(all)) !== null) {
+        const decoded = m[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/')
+        if (!images.includes(decoded)) images.push(decoded)
+      }
+    }
+
+    const music = videoData?.music?.playUrl || videoData?.music?.audio?.url || ''
+    const videoUrl = videoData?.video?.playAddr?.[0] || videoData?.video?.downloadAddr || ''
+
+    if (images.length || videoUrl) {
+      return { images, video: videoUrl, music }
+    }
+
+    console.log("Scraper: no se extrajo contenido")
+    return null
+  } catch (e) { console.log("Scraper error:", e.message); return null }
+}
+// ----
+
 async function tryYtDlp(url) {
   try {
     const ts = Date.now()
@@ -63,8 +121,7 @@ async function tryYtDlp(url) {
       '-f', 'best', '--no-playlist',
       '-o', join(tmpdir(), `tt_vid_${ts}_%(ext)s`), url
     ], { timeout: 120000, stdio: "pipe" })
-    const p = findFile(`tt_vid_${ts}`, ['.mp4', '.webm', '.mkv'])
-    if (p) return p
+    return findFile(`tt_vid_${ts}`, ['.mp4', '.webm', '.mkv'])
   } catch (e) { console.log("yt-dlp video fail:", e.message) }
   return null
 }
@@ -89,20 +146,22 @@ async function tryApi(url) {
   for (const api of apis) {
     try {
       const res = await fetch(api, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        signal: AbortSignal.timeout(15000)
       })
       if (!res.ok) { console.log(`API ${api.split('/')[2]} HTTP ${res.status}`); continue }
       const text = await res.text()
       let json
-      try { json = JSON.parse(text) } catch { continue }
+      try { json = JSON.parse(text) } catch { console.log(`API ${api.split('/')[2]}: JSON invalido`); continue }
       if (json.code === 0 && json.data) {
         const d = json.data
         return { images: d.images || [], video: d.play || d.wmplay || '', music: d.music || '' }
       }
       const images = json?.images || json?.image_urls || []
-      const video = json?.video_url || ''
+      const video = json?.video_url || json?.video || ''
       const music = json?.music?.playUrl || json?.music?.url || ''
       if (images.length || video) return { images, video, music }
+      console.log(`API ${api.split('/')[2]}: sin datos utiles`)
     } catch (e) { console.log(`API ${api.split('/')[2]} error:`, e.message) }
   }
   return null
@@ -115,123 +174,116 @@ export default async function handler(conn, m, args) {
     return conn.sendMessage(jid, { text: "📌 Envía un link de TikTok" }, { quoted: m })
   }
 
-  // Resolver URLs cortas (vt.tiktok.com) a la URL real
   if (/vt\.tiktok\.com/i.test(url)) {
     url = await resolveUrl(url)
     console.log("URL resuelta:", url)
   }
-
-  // Limpiar parametros de tracking que rompen APIs
   url = cleanTikTokUrl(url)
-  console.log("URL limpia:", url)
+  console.log("URL final:", url)
 
   await conn.sendMessage(jid, { text: "⏬ Descargando..." }, { quoted: m })
 
   // --- 1) SocialKit ---
   const sk = await socialkitDownload('tiktok', url)
-  if (sk) {
-    // Photos
-    if (sk.images?.length > 0) {
-      for (let i = 0; i < sk.images.length; i++) {
-        try {
-          await conn.sendMessage(jid, {
-            image: { url: sk.images[i] },
-            caption: `📸 TikTok foto ${i + 1}/${sk.images.length}`
-          }, { quoted: m })
-        } catch { console.log(`Error SocialKit imagen ${i+1}:`, sk.images[i]) }
-      }
-      if (sk.music) {
-        try {
-          const audio = await downloadToTemp(sk.music, ".mp3")
-          if (audio.size > 5000) {
-            await conn.sendMessage(jid, {
-              audio: readFileSync(audio.path), mimetype: "audio/mpeg"
-            }, { quoted: m })
-          }
-          try { unlinkSync(audio.path) } catch {}
-        } catch {}
-      }
-      return
-    }
-    // Video
-    if (sk.downloadUrl) {
+  if (sk?.images?.length) {
+    for (let i = 0; i < sk.images.length; i++) {
       try {
-        const f = await downloadToTemp(sk.downloadUrl, ".mp4")
-        if (f.size > 10000 && isValidMp4(f.path)) {
-          await conn.sendMessage(jid, {
-            video: readFileSync(f.path), caption: "🎬 TikTok descargado"
-          }, { quoted: m })
-          try { unlinkSync(f.path) } catch {}
-          return
-        }
-        try { unlinkSync(f.path) } catch {}
-      } catch { console.log("SocialKit video download fail") }
+        await conn.sendMessage(jid, { image: { url: sk.images[i] }, caption: `📸 TikTok foto ${i + 1}/${sk.images.length}` }, { quoted: m })
+      } catch { console.log(`Error SocialKit img ${i+1}:`, sk.images[i]) }
     }
+    if (sk.music) {
+      try {
+        const audio = await downloadToTemp(sk.music, ".mp3")
+        if (audio.size > 5000) await conn.sendMessage(jid, { audio: readFileSync(audio.path), mimetype: "audio/mpeg" }, { quoted: m })
+        try { unlinkSync(audio.path) } catch {}
+      } catch {}
+    }
+    return
+  }
+  if (sk?.downloadUrl) {
+    try {
+      const f = await downloadToTemp(sk.downloadUrl, ".mp4")
+      if (f.size > 10000 && isValidMp4(f.path)) {
+        await conn.sendMessage(jid, { video: readFileSync(f.path), caption: "🎬 TikTok descargado" }, { quoted: m })
+        try { unlinkSync(f.path) } catch {}; return
+      }
+      try { unlinkSync(f.path) } catch {}
+    } catch { console.log("SocialKit video download fail") }
   }
 
-  // --- 2) yt-dlp for video ---
+  // --- 2) Scraper directo (fotos de TikTok) ---
+  const scraped = await scrapeTikTokPage(url)
+  if (scraped?.images?.length) {
+    for (let i = 0; i < scraped.images.length; i++) {
+      try {
+        await conn.sendMessage(jid, { image: { url: scraped.images[i] }, caption: `📸 TikTok foto ${i + 1}/${scraped.images.length}` }, { quoted: m })
+      } catch { console.log(`Error scraper img ${i+1}:`, scraped.images[i]) }
+    }
+    if (scraped.music) {
+      try {
+        const audio = await downloadToTemp(scraped.music, ".mp3")
+        if (audio.size > 5000) await conn.sendMessage(jid, { audio: readFileSync(audio.path), mimetype: "audio/mpeg" }, { quoted: m })
+        try { unlinkSync(audio.path) } catch {}
+      } catch {}
+    }
+    return
+  }
+  if (scraped?.video) {
+    try {
+      const f = await downloadToTemp(scraped.video, ".mp4")
+      if (f.size > 10000 && isValidMp4(f.path)) {
+        await conn.sendMessage(jid, { video: readFileSync(f.path), caption: "🎬 TikTok descargado" }, { quoted: m })
+        try { unlinkSync(f.path) } catch {}; return
+      }
+      try { unlinkSync(f.path) } catch {}
+    } catch {}
+  }
+
+  // --- 3) yt-dlp for video ---
   if (HAS_YTDLP) {
     const ytPath = await tryYtDlp(url)
     if (ytPath) {
       try {
-        await conn.sendMessage(jid, {
-          video: readFileSync(ytPath), caption: "🎬 TikTok descargado"
-        }, { quoted: m })
-        try { unlinkSync(ytPath) } catch {}
-        return
+        await conn.sendMessage(jid, { video: readFileSync(ytPath), caption: "🎬 TikTok descargado" }, { quoted: m })
+        try { unlinkSync(ytPath) } catch {}; return
       } catch { try { unlinkSync(ytPath) } catch {} }
     }
   }
 
-  // --- 3) External APIs ---
+  // --- 4) External APIs ---
   const apiData = await tryApi(url)
-  if (!apiData) { console.log("Todas las APIs fallaron") }
-  if (apiData) {
-    if (apiData.images?.length > 0) {
-      for (let i = 0; i < apiData.images.length; i++) {
-        try {
-          await conn.sendMessage(jid, {
-            image: { url: apiData.images[i] },
-            caption: `📸 TikTok foto ${i + 1}/${apiData.images.length}`
-          }, { quoted: m })
-        } catch { console.log(`Error enviando imagen ${i+1}:`, apiData.images[i]) }
-      }
-      if (apiData.music) {
-        try {
-          const audio = await downloadToTemp(apiData.music, ".mp3")
-          if (audio.size > 5000) {
-            await conn.sendMessage(jid, {
-              audio: readFileSync(audio.path), mimetype: "audio/mpeg"
-            }, { quoted: m })
-          }
-          try { unlinkSync(audio.path) } catch {}
-        } catch {}
-      }
-      return
-    }
-    if (apiData.video) {
+  if (apiData?.images?.length) {
+    for (let i = 0; i < apiData.images.length; i++) {
       try {
-        const f = await downloadToTemp(apiData.video, ".mp4")
-        if (f.size > 10000 && isValidMp4(f.path)) {
-          await conn.sendMessage(jid, {
-            video: readFileSync(f.path), caption: "🎬 TikTok descargado"
-          }, { quoted: m })
-          try { unlinkSync(f.path) } catch {}
-          return
-        }
-        try { unlinkSync(f.path) } catch {}
+        await conn.sendMessage(jid, { image: { url: apiData.images[i] }, caption: `📸 TikTok foto ${i + 1}/${apiData.images.length}` }, { quoted: m })
+      } catch { console.log(`Error API img ${i+1}:`, apiData.images[i]) }
+    }
+    if (apiData.music) {
+      try {
+        const audio = await downloadToTemp(apiData.music, ".mp3")
+        if (audio.size > 5000) await conn.sendMessage(jid, { audio: readFileSync(audio.path), mimetype: "audio/mpeg" }, { quoted: m })
+        try { unlinkSync(audio.path) } catch {}
       } catch {}
     }
+    return
+  }
+  if (apiData?.video) {
+    try {
+      const f = await downloadToTemp(apiData.video, ".mp4")
+      if (f.size > 10000 && isValidMp4(f.path)) {
+        await conn.sendMessage(jid, { video: readFileSync(f.path), caption: "🎬 TikTok descargado" }, { quoted: m })
+        try { unlinkSync(f.path) } catch {}; return
+      }
+      try { unlinkSync(f.path) } catch {}
+    } catch {}
   }
 
-  // --- 4) Last resort: audio-only ---
+  // --- 5) Last resort: audio-only ---
   if (HAS_YTDLP) {
     const audioPath = await tryAudio(url)
     if (audioPath) {
       try {
-        await conn.sendMessage(jid, {
-          audio: readFileSync(audioPath), mimetype: "audio/mpeg"
-        }, { quoted: m })
+        await conn.sendMessage(jid, { audio: readFileSync(audioPath), mimetype: "audio/mpeg" }, { quoted: m })
       } catch {}
       try { unlinkSync(audioPath) } catch {}
       return
