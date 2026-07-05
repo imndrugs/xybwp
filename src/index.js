@@ -71,8 +71,32 @@ async function startBot() {
     }
 
     if (connection === 'close') {
-      console.log("❌ Conexión cerrada. Reconectando en 3s...")
-      setTimeout(() => startBot(), 3000)
+      const code = lastDisconnect?.error?.output?.statusCode
+      const reason = lastDisconnect?.error?.message || ''
+      console.log(`❌ Conexión cerrada (code: ${code}): ${reason}`)
+
+      const bad = code === DisconnectReason.loggedOut
+        || code === 401
+        || reason.includes('restricted')
+        || reason.includes('replaced')
+        || reason.includes('Connection Failure')
+        || !fs.existsSync('./sessions/creds.json')
+
+      if (bad) {
+        console.log('♻️ Sesión inválida. Limpiando sessions/ y reiniciando...')
+        try {
+          const dir = './sessions'
+          if (fs.existsSync(dir)) {
+            for (const f of fs.readdirSync(dir)) {
+              try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
+            }
+          }
+        } catch {}
+        setTimeout(() => startBot(), 2000)
+      } else {
+        console.log('♻️ Reconectando en 3s...')
+        setTimeout(() => startBot(), 3000)
+      }
     }
   })
 
