@@ -478,6 +478,19 @@ async function startBot() {
       return
     }
 
+    // Handle .n alias for notify
+    if (commandName === 'n' || commandName === 'notify') {
+      try {
+        const mod = await import(`./commands/notify.js`).catch(() => null)
+        if (mod?.default) {
+          await mod.default(conn, m, cmdArgs, global.db, chat)
+        }
+      } catch (e) {
+        console.log("Error comando:", e)
+      }
+      return
+    }
+
     try {
       const mod = await import(`./commands/${commandName}.js`)
         .catch(() => null)

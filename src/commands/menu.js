@@ -56,6 +56,7 @@
         ['del', 'Elimina un mensaje'],
         ['everyone', 'Menciona a todos'],
         ['todos', 'Menciona a todos'],
+        ['n / notify', 'Notifica a todos sin @'],
         ['antivirgenes', 'Activa filtro anti-binarios'],
         ['autoresponder', 'Auto-respuestas personalizadas'],
         ['afk', 'Estado ausente'],
