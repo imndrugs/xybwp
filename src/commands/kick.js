@@ -61,14 +61,13 @@ export default async function handler(conn, m, args, db) {
     return db.contacts?.[key] || conn.contacts?.[key]?.notify || key.split('@')[0]
   }
 
-  let text = ''
+  let parts = []
   if (kicked.length) {
-    text += `👢 Expulsados:\n` + kicked.map(u => `• ${getName(u)}`).join('\n')
+    parts.push(`👢 *Expulsados:*\n` + kicked.map(u => `• ${getName(u)}`).join('\n'))
   }
   if (errors.length) {
-    if (text) text += '\n\n'
-    text += `❌ No expulsados:\n` + errors.join('\n')
+    parts.push(`❌ *No expulsados:*\n` + errors.join('\n'))
   }
-
-  await conn.sendMessage(jid, { text }, { quoted: m })
+  parts.push('*CKV BOT*')
+  await conn.sendMessage(jid, { text: parts.join('\n\n') }, { quoted: m })
 }

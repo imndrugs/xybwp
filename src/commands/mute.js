@@ -59,6 +59,6 @@ export default async function handler(conn, m, args, db) {
 
   const name = db.contacts?.[targetId] || targetId.split('@')[0]
   return conn.sendMessage(jid, {
-    text: `🔇 Usuario muteado: ${name}\n\nTodos sus mensajes serán eliminados.\n⚠️ El bot necesita ser admin del grupo para borrar mensajes.`
+    text: `🔇 *${name}* muteado\n\n*CKV BOT*`
   }, { quoted: m })
 }

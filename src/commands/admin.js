@@ -33,7 +33,7 @@ export default async function handler(conn, m, args, db) {
   try {
     await conn.groupParticipantsUpdate(jid, [target], 'promote')
     const name = db.contacts?.[targetClean + '@s.whatsapp.net'] || targetClean
-    await conn.sendMessage(jid, { text: `⭐ *${name}* ahora es admin del grupo` }, { quoted: m })
+    await conn.sendMessage(jid, { text: `⭐ *${name}* ahora es admin del grupo\n\n*CKV BOT*` }, { quoted: m })
   } catch (e) {
     console.error('Error promoting:', e)
     await conn.sendMessage(jid, {

@@ -46,7 +46,7 @@ export default async function handler(conn, m, args, db) {
   try {
     await conn.groupParticipantsUpdate(jid, [target], 'demote')
     const name = db.contacts?.[targetClean + '@s.whatsapp.net'] || targetClean
-    await conn.sendMessage(jid, { text: `⬇️ *${name}* ya no es admin del grupo` }, { quoted: m })
+    await conn.sendMessage(jid, { text: `⬇️ *${name}* ya no es admin del grupo\n\n*CKV BOT*` }, { quoted: m })
   } catch (e) {
     console.error('Error demoting:', e)
     await conn.sendMessage(jid, {

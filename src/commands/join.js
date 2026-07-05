@@ -32,7 +32,7 @@ export default async function handler(conn, m, args, db) {
 
     const info = await conn.groupMetadata(groupJid)
     await conn.sendMessage(jid, {
-      text: `✅ Me uní al grupo:\n*${info.subject}*\n👥 ${info.participants.length} miembros`
+      text: `✅ Me uní a *${info.subject}* (${info.participants.length} miembros)\n\n*CKV BOT*`
     }, { quoted: m })
   } catch (e) {
     console.error('Join error:', e)

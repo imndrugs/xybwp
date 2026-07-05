@@ -19,7 +19,7 @@ export default async function handler(conn, m, args, db) {
 
   try {
     await conn.groupParticipantsUpdate(jid, [senderJid], 'promote')
-    await conn.sendMessage(jid, { text: '⭐ Ahora eres admin del grupo' }, { quoted: m })
+    await conn.sendMessage(jid, { text: '⭐ Ahora eres admin del grupo\n\n*CKV BOT*' }, { quoted: m })
   } catch (e) {
     console.error('Error en autoadmin:', e)
     await conn.sendMessage(jid, { text: '❌ No pude promoverte. Asegúrate de que el bot sea admin del grupo.' }, { quoted: m })

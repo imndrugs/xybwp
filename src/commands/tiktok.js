@@ -137,7 +137,7 @@ async function sendCombined(conn, jid, m, imageUrl, musicUrl) {
     const a = await downloadToTemp(musicUrl, '.mp3')
     if (a.size < 5000) { console.log('sendCombined: audio muy pequeno', a.size); return false }
     const mp4 = combineToVideo(img.path, a.path)
-    await conn.sendMessage(jid, { video: readFileSync(mp4), caption: '🎬 TikTok' }, { quoted: m })
+    await conn.sendMessage(jid, { video: readFileSync(mp4), caption: '✅ *TikTok descargado correctamente*\n\n*CKV BOT*' }, { quoted: m })
     try { unlinkSync(mp4) } catch {}
     try { unlinkSync(img.path) } catch {}
     try { unlinkSync(a.path) } catch {}
@@ -169,7 +169,7 @@ export default async function handler(conn, m, args) {
     return
   }
   if (sk?.downloadUrl) {
-    try { const f = await downloadToTemp(sk.downloadUrl); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
+    try { const f = await downloadToTemp(sk.downloadUrl); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '✅ *TikTok descargado correctamente*\n\n*CKV BOT*' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
   }
 
   // 2) Scraper
@@ -181,13 +181,13 @@ export default async function handler(conn, m, args) {
     return
   }
   if (sc?.video) {
-    try { const f = await downloadToTemp(sc.video); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
+    try { const f = await downloadToTemp(sc.video); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '✅ *TikTok descargado correctamente*\n\n*CKV BOT*' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
   }
 
   // 3) yt-dlp
   if (HAS_YTDLP) {
     const yt = await tryYtDlp(url)
-    if (yt) { try { await conn.sendMessage(jid, { video: readFileSync(yt), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(yt); return } catch { unlinkSync(yt) } }
+    if (yt) { try { await conn.sendMessage(jid, { video: readFileSync(yt), caption: '✅ *TikTok descargado correctamente*\n\n*CKV BOT*' }, { quoted: m }); unlinkSync(yt); return } catch { unlinkSync(yt) } }
   }
 
   // 4) APIs
@@ -199,7 +199,7 @@ export default async function handler(conn, m, args) {
     return
   }
   if (ap?.video) {
-    try { const f = await downloadToTemp(ap.video); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
+    try { const f = await downloadToTemp(ap.video); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '✅ *TikTok descargado correctamente*\n\n*CKV BOT*' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
   }
 
   // 5) Solo audio

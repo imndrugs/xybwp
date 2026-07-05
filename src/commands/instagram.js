@@ -152,7 +152,7 @@ export default async function handler(conn, m, args, db) {
           fs.writeFileSync(filePath, buf)
           if (buf.length > 10000 && isValidMp4(filePath)) {
             await conn.sendMessage(jid, {
-              video: buf, caption: "📥 Instagram reel descargado"
+              video: buf, caption: "✅ *Instagram descargado correctamente*\n\n*CKV BOT*"
             }, { quoted: m })
             try { fs.unlinkSync(filePath) } catch {}
             return
@@ -165,7 +165,7 @@ export default async function handler(conn, m, args, db) {
       for (let i = 0; i < sk.images.length; i++) {
         await conn.sendMessage(jid, {
           image: { url: sk.images[i] },
-          caption: `📸 Instagram foto ${i + 1}/${sk.images.length}`
+          caption: `✅ *Instagram* ${i + 1}/${sk.images.length}\n\n*CKV BOT*`
         }, { quoted: m })
       }
       return
@@ -186,7 +186,7 @@ export default async function handler(conn, m, args, db) {
       if (result.type === 'video') {
         const buffer = fs.readFileSync(result.path)
         await conn.sendMessage(jid, {
-          video: buffer, caption: "📥 Instagram reel descargado"
+          video: buffer, caption: "✅ *Instagram descargado correctamente*\n\n*CKV BOT*"
         }, { quoted: m })
         try { fs.unlinkSync(result.path) } catch {}
         return
@@ -200,7 +200,7 @@ export default async function handler(conn, m, args, db) {
           for (let i = 0; i < pageImages.length; i++) {
             await conn.sendMessage(jid, {
               image: { url: pageImages[i] },
-              caption: `📸 Instagram foto ${i + 1}/${pageImages.length}`
+              caption: `✅ *Instagram* ${i + 1}/${pageImages.length}\n\n*CKV BOT*`
             }, { quoted: m })
           }
           return
@@ -208,7 +208,7 @@ export default async function handler(conn, m, args, db) {
 
         for (let i = 0; i < result.count; i++) {
           await conn.sendMessage(jid, {
-            text: `📸 Instagram foto ${i + 1}/${result.count} (no se pudo descargar la imagen)`
+            text: `⚠️ *Instagram* ${i + 1}/${result.count} no se pudo descargar\n\n*CKV BOT*`
           }, { quoted: m })
         }
         return
@@ -217,7 +217,7 @@ export default async function handler(conn, m, args, db) {
       if (result.type === 'image') {
         await conn.sendMessage(jid, {
           image: { url: result.url },
-          caption: "📥 Instagram descargado"
+          caption: "✅ *Instagram descargado correctamente*\n\n*CKV BOT*"
         }, { quoted: m })
         return
       }

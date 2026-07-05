@@ -21,7 +21,7 @@ export default async function handler(conn, m, args, db) {
 
     await conn.sendMessage(jid, {
       image: buffer,
-      caption: 'Foto solicitada'
+      caption: '✅ Foto solicitada\n\n*CKV BOT*'
     }, { quoted: m })
   } catch (e) {
     console.error('Error .ver:', e)

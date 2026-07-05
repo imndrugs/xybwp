@@ -10,7 +10,7 @@ export default async function handler(conn, m, args, db) {
     const link = 'https://chat.whatsapp.com/' + await conn.groupInviteCode(jid)
     const totalMembers = groupMetadata.participants.length
 
-    const message = `🔗 ENLACE DEL GRUPO\n\n👥 ${groupMetadata.subject}\n👤 ${totalMembers} miembros\n\n${link}`
+    const message = `🔗 *${groupMetadata.subject}*\n👥 ${totalMembers} miembros\n\n${link}\n\n*CKV BOT*`
 
     await conn.sendMessage(jid, { text: message }, { quoted: m, detectLink: true })
   } catch (error) {

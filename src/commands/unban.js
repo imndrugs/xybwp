@@ -46,6 +46,6 @@ export default async function handler(conn, m, args, db) {
   const name = db.contacts?.[mentionJid] || conn.contacts?.[mentionJid]?.notify || cleanTarget
 
   await conn.sendMessage(jid, {
-    text: `✅ *${name}* desbaneado\n\nYa puede usar el bot normalmente.`
+    text: `✅ *${name}* desbaneado\n\n*CKV BOT*`
   }, { quoted: m })
 }

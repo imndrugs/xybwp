@@ -52,6 +52,6 @@ export default async function handler(conn, m, args, db) {
 
   const name = db.contacts?.[targetId] || targetId.split('@')[0]
   return conn.sendMessage(jid, {
-    text: `🔊 Usuario desmuteado: ${name}\n\nYa puede volver a escribir.`
+    text: `🔊 *${name}* desmuteado\n\n*CKV BOT*`
   }, { quoted: m })
 }

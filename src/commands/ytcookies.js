@@ -29,7 +29,7 @@ export default async function handler(conn, m, args, db) {
 
     writeFileSync('src/youtube_cookies.txt', content)
     await conn.sendMessage(jid, {
-      text: '✅ Cookies de YouTube actualizadas correctamente.\n\nAhora .play usará tu sesión para descargar.'
+      text: '✅ *Cookies de YouTube actualizadas*\n\n*CKV BOT*'
     }, { quoted: m })
   } catch (e) {
     console.error(e)

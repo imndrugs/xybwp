@@ -164,7 +164,7 @@ export default async function handler(conn, m, args, db) {
       try {
         const filePath = await downloadWithYtDlp(video.url)
         const buf = readFileSync(filePath)
-        await conn.sendMessage(jid, { video: buf, caption: `🎬 ${video.title}` }, { quoted: m })
+        await conn.sendMessage(jid, { video: buf, caption: `✅ *${video.title}*\n\n*CKV BOT*` }, { quoted: m })
         try { unlinkSync(filePath) } catch {}
       } catch (e) {
         await conn.sendMessage(jid, { text: `❌ ${e.message}` }, { quoted: m })

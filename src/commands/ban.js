@@ -61,6 +61,6 @@ export default async function handler(conn, m, args, db) {
   const name = db.contacts?.[mentionJid] || conn.contacts?.[mentionJid]?.notify || cleanTarget
 
   await conn.sendMessage(jid, {
-    text: `🚫 *${name}* baneado del bot\n📝 Motivo: ${motivo}\n\nYa no podrá usar comandos.`
+    text: `🚫 *${name}* baneado\n📝 Motivo: ${motivo}\n\n*CKV BOT*`
   }, { quoted: m })
 }
