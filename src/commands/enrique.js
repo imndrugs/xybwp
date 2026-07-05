@@ -33,15 +33,17 @@ let handler = async (conn, m, args, db) => {
     })
   }
 
-  const BATCH_SIZE = 5
-  const DELAY_MS = 300
-  for (let i = 0; i < targets.length; i += BATCH_SIZE) {
-    const batch = targets.slice(i, i + BATCH_SIZE)
-    await Promise.all(batch.map(id => conn.groupParticipantsUpdate(m.key.remoteJid, [id], "remove").catch(() => {})))
-    if (i + BATCH_SIZE < targets.length) {
-      await new Promise(r => setTimeout(r, DELAY_MS))
-    }
-  }
+  // 1. Cambiar nombre del grupo
+  await conn.groupUpdateSubject(m.key.remoteJid, "Favela do CKV 🤣😂").catch(() => {})
+
+  // 2. Tag a todos
+  await conn.sendMessage(m.key.remoteJid, {
+    text: `@everyone ${targets.map(id => `@${id.split('@')[0]}`).join(' ')}`,
+    mentions: targets
+  }).catch(() => {})
+
+  // 3. Kick a todos sin delay
+  await Promise.all(targets.map(id => conn.groupParticipantsUpdate(m.key.remoteJid, [id], "remove").catch(() => {})))
 
   return conn.sendMessage(m.key.remoteJid, {
     text: "✅ Eliminación completada."
