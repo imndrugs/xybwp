@@ -466,7 +466,7 @@ async function startBot() {
     // --- DISABLED COMMANDS CHECK ---
     if (commandName !== 'cmdoff' && commandName !== 'cmdon' && global._disabledCmds?.has(commandName)) {
       const ownerWhoDisabled = global._disabledCmds.get(commandName)
-      const ownerName = ownerWhoDisabled?.split('@')[0] || 'owner'
+      const ownerName = getName(ownerWhoDisabled) || ownerWhoDisabled?.split('@')[0] || 'owner'
       await conn.sendMessage(chat, {
         text: `"${commandName}" está desactivado por ${ownerName}`
       }, { quoted: m })
