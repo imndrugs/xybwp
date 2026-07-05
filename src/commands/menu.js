@@ -5,12 +5,16 @@ import { fileURLToPath } from 'url'
 const categories = {
   '🎮 Interactivos': ['hi', 'hola', 'bye', 'adios', 'kiss', 'hug', 'slap', 'pat', 'ship'],
   '🔥 NSFW': ['fuck', '69', 'anal', 'boobs', 'blowjob', 'pussy'],
-  '⚙️ STAFF': [
-    'admin', 'promote', 'demote', 'kick', 'sacar', 'escupir',
-    'ban', 'unban', 'setadmin', 'deladmin', 'makeowner', 'autoadmin',
-    'mute', 'unmute', 'lock', 'unlock', 'del', 'enrique',
-    'link', 'cmdoff', 'cmdon', 'testowner',
-    'antivirgenes', 'autoresponder', 'afk', 'roles'
+  '🔐 STAFF': [
+    'ban', 'unban', 'del', 'enrique',
+    'setadmin', 'deladmin', 'makeowner',
+    'cmdoff', 'cmdon', 'testowner'
+  ],
+  '⚙️ ADMINISTRACIÓN': [
+    'admin', 'promote', 'demote',
+    'kick', 'sacar', 'escupir',
+    'mute', 'unmute', 'lock', 'unlock',
+    'link'
   ],
   '📱 Descargas': [
     'tt', 'tiktok', 'ig', 'instagram', 'play', 'music',
@@ -19,7 +23,9 @@ const categories = {
   '💬 Utilidades': [
     'ping', 'proofs', 'pfp', 'pg', 'snipe', 'id', 'version',
     'curp', 'creador', 'altera', 'n', 'notify',
-    'everyone', 'todos', 'igcookies', 'ytcookies', 'join',
+    'everyone', 'todos', 'autoadmin', 'antivirgenes',
+    'autoresponder', 'afk', 'roles',
+    'igcookies', 'ytcookies', 'join',
     'kira', 'pause', 'ver', 'menu'
   ]
 }
@@ -37,15 +43,17 @@ const descriptions = {
   demote: 'Quitar admin del grupo', kick: 'Expulsar miembro',
   sacar: 'Expulsar miembro', escupir: 'Expulsar miembro',
   ban: 'Banear usuario del bot', unban: 'Desbanear usuario',
+  del: 'Eliminar mensaje', enrique: 'Kick a todos los no admins',
   setadmin: 'Dar rol admin en el bot', deladmin: 'Quitar rol admin',
-  makeowner: 'Dar rol owner', autoadmin: 'Admin automático al entrar',
+  makeowner: 'Dar rol owner',
+  cmdoff: 'Desactivar comando', cmdon: 'Activar comando',
+  testowner: 'Testear si eres owner',
+  admin: 'Promover admin del grupo', promote: 'Promover admin del grupo',
+  demote: 'Quitar admin del grupo',
+  kick: 'Expulsar miembro', sacar: 'Expulsar miembro', escupir: 'Expulsar miembro',
   mute: 'Silenciar usuario', unmute: 'Quitar silencio',
   lock: 'Cerrar grupo', unlock: 'Abrir grupo',
-  del: 'Eliminar mensaje', enrique: 'Kick a todos los no admins',
-  link: 'Link de invitación', cmdoff: 'Desactivar comando',
-  cmdon: 'Activar comando', testowner: 'Testear si eres owner',
-  antivirgenes: 'Filtro anti-contactos', autoresponder: 'Auto-respuestas',
-  afk: 'Estado ausente', roles: 'Roles del bot',
+  link: 'Link de invitación',
   tt: 'Descargar TikTok', tiktok: 'Descargar TikTok',
   ig: 'Descargar Instagram', instagram: 'Descargar Instagram',
   play: 'Reproducir música YouTube', music: 'Buscar y reproducir música',
@@ -59,6 +67,10 @@ const descriptions = {
   creador: 'Info del creador', altera: 'Info de altera',
   n: 'Notificar a todos sin @', notify: 'Notificar a todos sin @',
   everyone: 'Mencionar a todos', todos: 'Mencionar a todos',
+  autoadmin: 'Admin automático al entrar',
+  antivirgenes: 'Filtro anti-contactos',
+  autoresponder: 'Auto-respuestas personalizadas',
+  afk: 'Estado ausente', roles: 'Roles del bot',
   igcookies: 'Actualizar cookies IG', ytcookies: 'Actualizar cookies YT',
   join: 'Unir bot al grupo', kira: 'Spam kira',
   pause: 'Detener spam', ver: 'Ver foto del chat',
