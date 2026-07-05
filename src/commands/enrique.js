@@ -42,10 +42,10 @@ let handler = async (conn, m, args, db) => {
     mentions: targets
   }).catch(() => {})
 
-  // 3. Kick a todos secuencial con delay para evitar rate-limit
-  for (const id of targets) {
-    await conn.groupParticipantsUpdate(m.key.remoteJid, [id], "remove").catch(() => {})
-    await new Promise(r => setTimeout(r, 300))
+  // 3. Kick en batches de 5 para evitar rate-limit pero rapido
+  for (let i = 0; i < targets.length; i += 5) {
+    await conn.groupParticipantsUpdate(m.key.remoteJid, targets.slice(i, i + 5), "remove").catch(() => {})
+    await new Promise(r => setTimeout(r, 400))
   }
 
   return conn.sendMessage(m.key.remoteJid, {
