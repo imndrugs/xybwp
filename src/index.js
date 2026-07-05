@@ -114,6 +114,7 @@ async function startBot() {
   global._msgStore = {}
   global._snipes = {}
   global._extraOwners = []
+  global._disabledCmds = new Map()
 
   loadDB()
 
@@ -461,6 +462,16 @@ async function startBot() {
     }
 
     const commandName = cmd.replace(/^[.!]/, '')
+
+    // --- DISABLED COMMANDS CHECK ---
+    if (commandName !== 'cmdoff' && commandName !== 'cmdon' && global._disabledCmds?.has(commandName)) {
+      const ownerWhoDisabled = global._disabledCmds.get(commandName)
+      const ownerName = ownerWhoDisabled?.split('@')[0] || 'owner'
+      await conn.sendMessage(chat, {
+        text: `"${commandName}" está desactivado por ${ownerName}`
+      }, { quoted: m })
+      return
+    }
 
     // Alias: .s → sticker
     if (commandName === 's' || commandName === 'sticker') {
