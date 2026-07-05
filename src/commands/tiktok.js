@@ -18,6 +18,13 @@ async function resolveUrl(shortUrl) {
   } catch { return shortUrl }
 }
 
+function cleanTikTokUrl(url) {
+  // Quitar parametros de tracking (?_r=1&_t=...)
+  const idx = url.indexOf('?')
+  if (idx !== -1) url = url.substring(0, idx)
+  return url
+}
+
 function isValidMp4(filePath) {
   try {
     return readFileSync(filePath).slice(4, 8).toString() === 'ftyp'
@@ -114,6 +121,10 @@ export default async function handler(conn, m, args) {
     console.log("URL resuelta:", url)
   }
 
+  // Limpiar parametros de tracking que rompen APIs
+  url = cleanTikTokUrl(url)
+  console.log("URL limpia:", url)
+
   await conn.sendMessage(jid, { text: "⏬ Descargando..." }, { quoted: m })
 
   // --- 1) SocialKit ---
@@ -122,10 +133,12 @@ export default async function handler(conn, m, args) {
     // Photos
     if (sk.images?.length > 0) {
       for (let i = 0; i < sk.images.length; i++) {
-        await conn.sendMessage(jid, {
-          image: { url: sk.images[i] },
-          caption: `📸 TikTok foto ${i + 1}/${sk.images.length}`
-        }, { quoted: m })
+        try {
+          await conn.sendMessage(jid, {
+            image: { url: sk.images[i] },
+            caption: `📸 TikTok foto ${i + 1}/${sk.images.length}`
+          }, { quoted: m })
+        } catch { console.log(`Error SocialKit imagen ${i+1}:`, sk.images[i]) }
       }
       if (sk.music) {
         try {
@@ -176,10 +189,12 @@ export default async function handler(conn, m, args) {
   if (apiData) {
     if (apiData.images?.length > 0) {
       for (let i = 0; i < apiData.images.length; i++) {
-        await conn.sendMessage(jid, {
-          image: { url: apiData.images[i] },
-          caption: `📸 TikTok foto ${i + 1}/${apiData.images.length}`
-        }, { quoted: m })
+        try {
+          await conn.sendMessage(jid, {
+            image: { url: apiData.images[i] },
+            caption: `📸 TikTok foto ${i + 1}/${apiData.images.length}`
+          }, { quoted: m })
+        } catch { console.log(`Error enviando imagen ${i+1}:`, apiData.images[i]) }
       }
       if (apiData.music) {
         try {
