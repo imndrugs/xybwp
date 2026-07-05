@@ -15,6 +15,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { execSync } from 'child_process'
 import { isBanned } from './lib/perms.js'
+import { serialize } from './lib/serialize.js'
 
 dotenv.config()
 
@@ -235,7 +236,7 @@ async function startBot() {
 
   conn.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
-    const m = messages[0]
+    const m = serialize(messages[0])
     if (!m?.key?.remoteJid || m.key.fromMe) return
 
     const msgId = m.key.id
@@ -382,8 +383,8 @@ async function startBot() {
     }
 
     // --- AFK CHECK ---
-    if (isGroup && m.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
-      for (const mentioned of m.message.extendedTextMessage.contextInfo.mentionedJid) {
+    if (isGroup && m.mentionedJid?.length) {
+      for (const mentioned of m.mentionedJid) {
         const afkKey = normalizedId(mentioned)
         const afkData = global.db.data?.afk?.[afkKey]
         if (afkData) {
@@ -401,14 +402,10 @@ async function startBot() {
 
     // --- AUTORESPONDER (per-group) ---
     if (isGroup) {
-      const textContent =
-        m.message.conversation ||
-        m.message.extendedTextMessage?.text ||
-        ''
       const ar = global.db.data?.autoresponder || {}
       const groupTriggers = { ...(ar['global'] || {}), ...(ar[chat] || {}) }
       for (const [trigger, response] of Object.entries(groupTriggers)) {
-        if (textContent.toLowerCase().includes(trigger.toLowerCase())) {
+        if (m.text.toLowerCase().includes(trigger.toLowerCase())) {
           await conn.sendMessage(chat, { text: response }, { quoted: m })
           break
         }
@@ -426,25 +423,17 @@ async function startBot() {
     }
 
     // --- TAG BOT RESPONSE ---
-    if (m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.some(j => normalizedId(j) === botJid)) {
+    if (m.mentionedJid?.some(j => normalizedId(j) === botJid)) {
       if (sender !== botJid) {
-        const textContent =
-          m.message.conversation ||
-          m.message.extendedTextMessage?.text ||
-          ''
+        const textContent = m.text || ''
         const cleanCmd = textContent.replace(/^[.!]+\s*/, '').trim()
-        // Only respond if it's not a command (starts with ! or .)
         if (!/^[.!]/.test(textContent.trim())) {
           await conn.sendMessage(chat, { text: 'no estes chingando puta' }, { quoted: m })
         }
       }
     }
 
-    const text =
-      m.message.conversation ||
-      m.message.extendedTextMessage?.text ||
-      ''
-
+    const text = m.text || m.message?.conversation || m.message?.extendedTextMessage?.text || ''
     if (!text) return
 
     const trimmed = text.trim()
