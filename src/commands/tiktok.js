@@ -55,62 +55,77 @@ function findFile(prefix, exts) {
   return null
 }
 
-// ---- Scraper directo de la pagina de TikTok (fotos) ----
-async function scrapeTikTokPage(url) {
+// ---- TikTok Internal API + fallback scraper ----
+function extractId(url) {
+  const m = url.match(/\/(?:video|photo)\/(\d+)/)
+  return m ? m[1] : ''
+}
+
+async function fetchWithTimeout(url, options = {}, ms = 15000) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), ms)
   try {
-    const res = await fetch(url, {
+    const res = await fetch(url, { ...options, signal: ctrl.signal })
+    return res
+  } finally { clearTimeout(timer) }
+}
+
+async function scrapeTikTokPage(url) {
+  const itemId = extractId(url)
+  if (!itemId) { console.log("Scraper: no se pudo extraer itemId"); return null }
+
+  const apiUrl = `https://www.tiktok.com/api/item/detail/?itemId=${itemId}&aid=1988`
+  try {
+    const res = await fetchWithTimeout(apiUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      },
-      signal: AbortSignal.timeout(15000)
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.tiktok.com/'
+      }
     })
-    if (!res.ok) { console.log("Scraper HTTP", res.status); return null }
-    const html = await res.text()
+    if (!res.ok) { console.log("TikTok API HTTP", res.status); return null }
+    const json = await res.json()
+    if (!json?.itemInfo?.itemStruct) { console.log("TikTok API: sin datos"); return null }
 
-    // Buscar JSON en <script id="__NEXT_DATA__">
-    const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/)
-    const stateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});/);
-    const rawJson = nextMatch?.[1] || stateMatch?.[1]
-    if (!rawJson) { console.log("Scraper: no se encontro JSON en pagina"); return null }
-
-    let data
-    try { data = JSON.parse(rawJson) } catch { console.log("Scraper: JSON invalido"); return null }
-
-    // Navegar por la estructura del JSON de TikTok
-    const videoData =
-      data?.props?.pageProps?.videoData ||
-      data?.props?.pageProps?.itemInfo?.itemStruct ||
-      data?.__INITIAL_STATE__?.videoData ||
-      data
-
+    const item = json.itemInfo.itemStruct
     const images = []
-    if (videoData?.imagePost?.images) {
-      for (const img of videoData.imagePost.images) {
-        const u = img?.imageURL?.urlList?.[0] || img?.imageURL || ''
+    if (item.imagePost?.images) {
+      for (const img of item.imagePost.images) {
+        const u = img?.imageURL?.urlList?.[0] || ''
         if (u) images.push(u)
       }
     }
-    // Fallback: buscar displaySrc/imageSrc en el JSON
-    if (!images.length) {
-      const all = JSON.stringify(data)
-      const regex = /"displaySrc"\s*:\s*"([^"]+)"/g
-      let m
-      while ((m = regex.exec(all)) !== null) {
-        const decoded = m[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/')
-        if (!images.includes(decoded)) images.push(decoded)
-      }
+    const music = item.music?.playUrl || item.music?.audio?.url || ''
+    const videoUrl = item.video?.playAddr?.[0] || item.video?.downloadAddr || ''
+
+    if (images.length || videoUrl) return { images, video: videoUrl, music }
+    console.log("TikTok API: sin imagenes ni video")
+  } catch (e) { console.log("TikTok API error:", e.message) }
+
+  // Fallback: scrape page html
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    })
+    if (!res.ok) { console.log("Scraper HTML HTTP", res.status); return null }
+    const html = await res.text()
+    const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/)
+    const stateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});/)
+    const rawJson = nextMatch?.[1] || stateMatch?.[1]
+    if (!rawJson) { console.log("Scraper HTML: no JSON"); return null }
+    let data
+    try { data = JSON.parse(rawJson) } catch { return null }
+    const all = JSON.stringify(data)
+    const imgUrls = []
+    const regex = /"displaySrc"\s*:\s*"([^"]+)"/g
+    let m
+    while ((m = regex.exec(all)) !== null) {
+      const decoded = m[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/')
+      if (!imgUrls.includes(decoded)) imgUrls.push(decoded)
     }
+    if (imgUrls.length) return { images: imgUrls, video: '', music: '' }
+  } catch (e) { console.log("Scraper HTML error:", e.message) }
 
-    const music = videoData?.music?.playUrl || videoData?.music?.audio?.url || ''
-    const videoUrl = videoData?.video?.playAddr?.[0] || videoData?.video?.downloadAddr || ''
-
-    if (images.length || videoUrl) {
-      return { images, video: videoUrl, music }
-    }
-
-    console.log("Scraper: no se extrajo contenido")
-    return null
-  } catch (e) { console.log("Scraper error:", e.message); return null }
+  return null
 }
 // ----
 
@@ -145,10 +160,9 @@ async function tryApi(url) {
   ]
   for (const api of apis) {
     try {
-      const res = await fetch(api, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-        signal: AbortSignal.timeout(15000)
-      })
+      const res = await fetchWithTimeout(api, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+      }, 15000)
       if (!res.ok) { console.log(`API ${api.split('/')[2]} HTTP ${res.status}`); continue }
       const text = await res.text()
       let json
