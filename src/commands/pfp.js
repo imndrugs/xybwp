@@ -7,53 +7,42 @@ export default async function handler(conn, m, args, db) {
   let target = null
   const ctx = m.message?.extendedTextMessage?.contextInfo
 
-  if (ctx?.mentionedJid?.length) {
-    target = ctx.mentionedJid[0]
-  }
-
-  if (!target && ctx?.participant) {
-    target = ctx.participant
-  }
+  if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0]
+  if (!target && ctx?.participant) target = ctx.participant
 
   if (!target && args.length) {
     const digits = args.join('').replace(/\D/g, '')
-    if (digits.length >= 10) {
-      target = digits + '@s.whatsapp.net'
-    } else {
-      return conn.sendMessage(chat, { text: '⚠️ Número inválido. Ej: .pfp 525644444644' }, { quoted: m })
-    }
+    if (digits.length >= 10) target = digits + '@s.whatsapp.net'
+    else return conn.sendMessage(chat, { text: '⚠️ Número inválido. Ej: .pfp 525644444644' }, { quoted: m })
   }
 
-  if (!target) {
-    target = m.key?.participant || chat
-  }
+  if (!target) target = m.key?.participant || chat
 
   const targetNum = clean(target)
-  if (!targetNum || clean(botJid).includes(targetNum)) {
+  if (!targetNum || clean(botJid) === targetNum) {
     return conn.sendMessage(chat, { text: '⚠️ No puedes usar mi foto de perfil' }, { quoted: m })
   }
 
-  // Probar 3 formatos de JID
-  const jids = [
-    targetNum + '@s.whatsapp.net',
-    targetNum + '@c.us',
-    target,
-  ]
+  async function queryPp(jid, type) {
+    try {
+      const res = await conn.query({
+        tag: 'iq',
+        attrs: { target: jid, to: '@s.whatsapp.net', type: 'get', xmlns: 'w:profile:picture' },
+        content: [{ tag: 'picture', attrs: { type, query: 'url' } }]
+      })
+      const children = Array.isArray(res?.content) ? res.content : []
+      const pic = children.find(c => c?.tag === 'picture')
+      return pic?.attrs?.url || null
+    } catch (e) {
+      console.log(`pfp query fail ${jid} ${type}:`, e.message)
+      return null
+    }
+  }
 
-  let ppUrl
-  for (const jid of jids) {
-    try {
-      ppUrl = await conn.profilePictureUrl(jid, 'image')
-      if (ppUrl) break
-    } catch (e) {
-      console.log('pfp try', jid, '->', e.message)
-    }
-    try {
-      ppUrl = await conn.profilePictureUrl(jid, 'preview')
-      if (ppUrl) break
-    } catch (e) {
-      console.log('pfp preview try', jid, '->', e.message)
-    }
+  let ppUrl = null
+  for (const suffix of ['@s.whatsapp.net', '@c.us']) {
+    ppUrl = await queryPp(targetNum + suffix, 'image') || await queryPp(targetNum + suffix, 'preview')
+    if (ppUrl) break
   }
 
   console.log('pfp target:', target, 'num:', targetNum, 'url:', ppUrl)
@@ -67,14 +56,12 @@ export default async function handler(conn, m, args, db) {
 
   try {
     await conn.sendMessage(chat, { text: '📸 Guardando foto...' }, { quoted: m })
-
     await conn.updateProfilePicture(botJid, { url: ppUrl }).catch(e => {
       console.log('pfp updateProfilePicture error:', e.message)
     })
-
     await conn.sendMessage(chat, { image: { url: ppUrl }, caption: `Foto de @${targetNum}` }, { quoted: m })
   } catch (e) {
-    console.log('pfp error:', e.message)
+    console.log('pfp send error:', e.message)
     await conn.sendMessage(chat, {
       text: `❌ Error al obtener la foto de @${targetNum}`,
       mentions: [targetNum + '@s.whatsapp.net']
