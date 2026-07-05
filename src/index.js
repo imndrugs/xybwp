@@ -450,6 +450,21 @@ async function startBot() {
 
     if (!text) return
 
+    // --- NOTIFY sin prefijo (también con prefijo) ---
+    const notifyMatch = text.trim().match(/^[.!]?\s*(n|notify)\b\s*(.*)/i)
+    if (notifyMatch) {
+      const notifyArgs = notifyMatch[2].trim() ? notifyMatch[2].split(/ +/) : []
+      try {
+        const mod = await import(`./commands/notify.js`).catch(() => null)
+        if (mod?.default) {
+          await mod.default(conn, m, notifyArgs, global.db, chat)
+        }
+      } catch (e) {
+        console.log("Error notify:", e)
+      }
+      return
+    }
+
     const trimmed = text.trim()
     const hasPrefix = /^[.!]/.test(trimmed) || /^xyb\b/i.test(trimmed)
     if (!hasPrefix) return
