@@ -135,11 +135,16 @@ async function startBot() {
   global._extraOwners = []
   global._disabledCmds = new Map()
   const _cmdsDir = path.dirname(fileURLToPath(import.meta.url))
-  global._validCommands = new Set(
-    fs.readdirSync(path.join(_cmdsDir, 'commands'))
-      .filter(f => f.endsWith('.js'))
-      .map(f => f.replace(/\.js$/, ''))
-  )
+  global._commands = {}
+  global._validCommands = new Set()
+  for (const f of fs.readdirSync(path.join(_cmdsDir, 'commands')).filter(f => f.endsWith('.js'))) {
+    const name = f.replace(/\.js$/, '')
+    global._validCommands.add(name)
+    try {
+      const mod = await import(`./commands/${f}`)
+      if (mod?.default) global._commands[name] = mod.default
+    } catch {}
+  }
 
   loadDB()
 
@@ -466,15 +471,15 @@ async function startBot() {
 
     const trimmed = text.trim()
     const args = trimmed.split(/ +/)
-    let cmd = args[0].toLowerCase()
+    let rawCmd = args[0].toLowerCase()
     let cmdArgs = args.slice(1)
 
-    if (cmd === 'xyb' && args.length > 1) {
-      cmd = args[1].toLowerCase()
+    if (rawCmd === 'xyb' && args.length > 1) {
+      rawCmd = args[1].toLowerCase()
       cmdArgs = args.slice(2)
     }
 
-    const commandName = cmd.replace(/^[.!]/, '')
+    const commandName = rawCmd.replace(/^[.!]/, '')
 
     // --- VALIDATE COMMAND against known files ---
     if (commandName !== 's' && commandName !== 'sticker' && commandName !== 'n' && commandName !== 'notify' && !global._validCommands?.has(commandName)) {
@@ -491,42 +496,13 @@ async function startBot() {
       return
     }
 
-    // Alias: .s → sticker
-    if (commandName === 's' || commandName === 'sticker') {
+    const cmd = global._commands[commandName === 's' ? 'sticker' : commandName === 'n' ? 'notify' : commandName]
+    if (cmd) {
       try {
-        const mod = await import(`./commands/sticker.js`).catch(() => null)
-        if (mod?.default) {
-          await mod.default(conn, m, cmdArgs, global.db, chat)
-        }
+        await cmd(conn, m, cmdArgs, global.db, chat)
       } catch (e) {
         console.log("Error comando:", e)
       }
-      return
-    }
-
-    // Alias: .n → notify
-    if (commandName === 'n' || commandName === 'notify') {
-      try {
-        const mod = await import(`./commands/notify.js`).catch(() => null)
-        if (mod?.default) {
-          await mod.default(conn, m, cmdArgs, global.db, chat)
-        }
-      } catch (e) {
-        console.log("Error comando:", e)
-      }
-      return
-    }
-
-    try {
-      const mod = await import(`./commands/${commandName}.js`)
-        .catch(() => null)
-
-      if (mod?.default) {
-        await mod.default(conn, m, cmdArgs, global.db, chat)
-      }
-
-    } catch (e) {
-      console.log("Error comando:", e)
     }
   })
 }

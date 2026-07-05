@@ -25,7 +25,22 @@ export default async function handler(conn, m, args, db) {
   await conn.sendMessage(jid, { text: '⏳ Intentando unirme al grupo...' }, { quoted: m })
 
   try {
-    const groupJid = await conn.groupAcceptInvite(code)
+    let groupJid = null
+    const maxRetries = 3
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        groupJid = await conn.groupAcceptInvite(code)
+        if (groupJid) break
+      } catch (retryErr) {
+        const msg = retryErr?.message || ''
+        if (msg.includes('account_reachout_restricted') && i < maxRetries - 1) {
+          console.log(`Join retry ${i + 1}/${maxRetries} after restriction...`)
+          await new Promise(r => setTimeout(r, 5000))
+          continue
+        }
+        throw retryErr
+      }
+    }
     if (!groupJid) {
       throw new Error('La API retornó vacío — link expirado o grupo lleno')
     }
