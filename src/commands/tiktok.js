@@ -46,10 +46,11 @@ async function tryYtDlp(url) {
   try {
     const ts = Date.now()
     execFileSync(YT_DLP, [
-      '-f', 'bestvideo+bestaudio', '--merge-output-format', 'mp4',
-      '--no-playlist', '-o', join(tmpdir(), `tt_vid_${ts}_%(ext)s`), url
+      '-f', 'best', '--no-playlist',
+      '-o', join(tmpdir(), `tt_vid_${ts}_%(ext)s`), url
     ], { timeout: 120000, stdio: "pipe" })
-    return findFile(`tt_vid_${ts}`, ['.mp4', '.webm', '.mkv'])
+    const p = findFile(`tt_vid_${ts}`, ['.mp4', '.webm', '.mkv'])
+    if (p) return p
   } catch (e) { console.log("yt-dlp video fail:", e.message) }
   return null
 }
@@ -158,6 +159,7 @@ export default async function handler(conn, m, args) {
 
   // --- 3) External APIs ---
   const apiData = await tryApi(url)
+  if (!apiData) { console.log("Todas las APIs fallaron") }
   if (apiData) {
     if (apiData.images?.length > 0) {
       for (let i = 0; i < apiData.images.length; i++) {
