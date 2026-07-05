@@ -1,53 +1,48 @@
-import { getSenderId, clean } from '../lib/perms.js'
+import { clean } from '../lib/perms.js'
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
-  const sender = getSenderId(m)
 
   let who = null
 
-  const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage
-  if (quotedMsg) {
-    who = m.message?.extendedTextMessage?.contextInfo?.participant || sender
+  const quoted = m.message?.extendedTextMessage?.contextInfo
+  if (quoted?.quotedMessage && quoted?.participant) {
+    who = quoted.participant
   }
 
-  const mentionedJid = m.message?.extendedTextMessage?.contextInfo?.mentionedJid
-  if (!who && mentionedJid?.[0]) {
-    who = mentionedJid[0]
+  if (!who && quoted?.mentionedJid?.length) {
+    who = quoted.mentionedJid[0]
   }
 
   if (!who && args.length > 0) {
-    let numero = args.join('').replace(/[^0-9]/g, '')
-    if (numero.length < 10) {
-      return conn.sendMessage(jid, { text: '⚠️ Número inválido. Usa el código de país.\nEj: .pfp 525644444644' }, { quoted: m })
+    const num = args.join('').replace(/\D/g, '')
+    if (num.length >= 10) {
+      who = num + '@s.whatsapp.net'
+    } else {
+      return conn.sendMessage(jid, { text: '⚠️ Número inválido. Ej: .pfp 525644444644' }, { quoted: m })
     }
-    who = numero
   }
 
   if (!who) {
-    who = sender
+    who = m.key?.participant || jid
   }
 
-  who = clean(who)
-  const whoFull = who.includes('@') ? who : who + '@s.whatsapp.net'
+  const cleaned = clean(who)
+  const jidWho = cleaned + '@s.whatsapp.net'
 
   try {
-    const ppUrl = await conn.profilePictureUrl(whoFull, 'image')
-
+    const ppUrl = await conn.profilePictureUrl(jidWho, 'image')
     await conn.sendMessage(jid, { text: '📸 Guardando foto...' }, { quoted: m })
-
-    await conn.updateProfilePicture(conn.user?.id || conn.user?.jid, { url: ppUrl })
-
+    await conn.updateProfilePicture(conn.user?.id || conn.user?.jid, { url: ppUrl }).catch(() => {})
     await conn.sendMessage(jid, {
       image: { url: ppUrl },
-      caption: `Foto de @${who}`,
-      mentions: [whoFull]
+      caption: `Foto de @${cleaned}`,
+      mentions: [jidWho]
     }, { quoted: m })
-  } catch (error) {
-    console.error('❌ Error en pfp:', error?.message)
+  } catch (e) {
     await conn.sendMessage(jid, {
-      text: `👤 @${who} no tiene foto de perfil o la tiene privada`,
-      mentions: [whoFull]
+      text: `👤 @${cleaned} no tiene foto de perfil o es privada`,
+      mentions: [jidWho]
     }, { quoted: m })
   }
 }
