@@ -21,11 +21,7 @@ let handler = async (conn, m, args, db) => {
   }
 
   const targets = metadata.participants
-    .filter(p =>
-      p.id !== botId &&
-      !p.admin &&
-      !isOwner(p.id)
-    )
+    .filter(p => p.id !== botId && !isOwner(p.id))
     .map(p => p.id)
 
   if (!targets.length) {
