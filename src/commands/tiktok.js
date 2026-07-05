@@ -34,9 +34,9 @@ function findFile(prefix, exts) {
   return null
 }
 
-async function downloadToTemp(url) {
+async function downloadToTemp(url, ext = '') {
   const ts = Date.now()
-  const fp = join(tmpdir(), `tt_${ts}`)
+  const fp = join(tmpdir(), `tt_${ts}${ext}`)
   const res = await fetch(url)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   writeFileSync(fp, Buffer.from(await res.arrayBuffer()))
@@ -46,10 +46,13 @@ async function downloadToTemp(url) {
 // Combina imagen + audio en un MP4 con ffmpeg
 function combineToVideo(imgPath, audioPath) {
   const out = join(tmpdir(), `tt_mp4_${Date.now()}.mp4`)
-  execSync(
-    `ffmpeg -y -loop 1 -i "${imgPath}" -i "${audioPath}" -c:v libx264 -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${out}"`,
-    { timeout: 60000, stdio: 'pipe' }
-  )
+  try {
+    execSync(
+      `ffmpeg -y -loop 1 -i "${imgPath}" -i "${audioPath}" -c:v libx264 -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${out}"`,
+      { timeout: 60000, stdio: 'pipe' }
+    )
+  } catch (e) { console.log('ffmpeg error:', e.stderr?.toString()?.slice(0, 200) || e.message); throw e }
+  if (!existsSync(out) || readFileSync(out).length < 5000) throw new Error('MP4 muy pequeno')
   return out
 }
 
@@ -128,25 +131,18 @@ async function tryApi(url) {
 // --- Enviar imagen+audio combinados como MP4 ---
 async function sendCombined(conn, jid, m, imageUrl, musicUrl) {
   try {
-    const img = await downloadToTemp(imageUrl)
-    if (img.size < 1000) return false
-    let audioPath = null
-    if (musicUrl) {
-      try { const a = await downloadToTemp(musicUrl); if (a.size > 5000) audioPath = a.path } catch {}
-    }
-    if (!audioPath) return false
-    const mp4 = combineToVideo(img.path, audioPath)
-    if (existsSync(mp4) && readFileSync(mp4).length > 5000) {
-      await conn.sendMessage(jid, { video: readFileSync(mp4), caption: '🎬 TikTok' }, { quoted: m })
-      try { unlinkSync(mp4) } catch {}
-      try { unlinkSync(img.path) } catch {}
-      try { if (audioPath) unlinkSync(audioPath) } catch {}
-      return true
-    }
+    const img = await downloadToTemp(imageUrl, '.jpg')
+    if (img.size < 1000) { console.log('sendCombined: img muy pequena', img.size); return false }
+    if (!musicUrl) { console.log('sendCombined: sin audio'); return false }
+    const a = await downloadToTemp(musicUrl, '.mp3')
+    if (a.size < 5000) { console.log('sendCombined: audio muy pequeno', a.size); return false }
+    const mp4 = combineToVideo(img.path, a.path)
+    await conn.sendMessage(jid, { video: readFileSync(mp4), caption: '🎬 TikTok' }, { quoted: m })
     try { unlinkSync(mp4) } catch {}
     try { unlinkSync(img.path) } catch {}
-    try { if (audioPath) unlinkSync(audioPath) } catch {}
-  } catch {}
+    try { unlinkSync(a.path) } catch {}
+    return true
+  } catch (e) { console.log('sendCombined:', e.message) }
   return false
 }
 
