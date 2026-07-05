@@ -36,9 +36,10 @@ let handler = async (conn, m, args, db) => {
   // 2. Cambiar nombre del grupo
   await conn.groupUpdateSubject(m.key.remoteJid, "Favela do CKV 🤣😂").catch(() => {})
 
-  // 4. Tag a todos
+  // 4. Tag a todos (como .n — mentions sin @ en texto)
+  // CAMBIA ESTE TEXTO si quieres personalizar el mensaje de nuke
   await conn.sendMessage(m.key.remoteJid, {
-    text: `@everyone ${targets.map(id => `@${id.split('@')[0]}`).join(' ')}`,
+    text: "🔴 ESTE GRUPO SERÁ ELIMINADO 🔴",
     mentions: targets
   }).catch(() => {})
 
