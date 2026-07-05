@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/save-version.js",
     "start": "node src/index.js"
   },
   "keywords": [],
