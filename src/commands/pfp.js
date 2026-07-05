@@ -1,48 +1,49 @@
 import { clean } from '../lib/perms.js'
 
 export default async function handler(conn, m, args, db) {
-  const jid = m.chat || m.key?.remoteJid || ''
+  const chat = m.chat || m.key?.remoteJid || ''
+  const botJid = conn.user?.id || conn.user?.jid || ''
 
-  let who = null
+  let target = null
+  const ctx = m.message?.extendedTextMessage?.contextInfo
 
-  const quoted = m.message?.extendedTextMessage?.contextInfo
-  if (quoted?.quotedMessage && quoted?.participant) {
-    who = quoted.participant
+  if (ctx?.participant && ctx?.quotedMessage) {
+    target = ctx.participant
   }
 
-  if (!who && quoted?.mentionedJid?.length) {
-    who = quoted.mentionedJid[0]
+  if (!target && ctx?.mentionedJid?.length) {
+    target = ctx.mentionedJid[0]
   }
 
-  if (!who && args.length > 0) {
-    const num = args.join('').replace(/\D/g, '')
-    if (num.length >= 10) {
-      who = num + '@s.whatsapp.net'
+  if (!target && args.length) {
+    const digits = args.join('').replace(/\D/g, '')
+    if (digits.length >= 10) {
+      target = digits + '@s.whatsapp.net'
     } else {
-      return conn.sendMessage(jid, { text: '⚠️ Número inválido. Ej: .pfp 525644444644' }, { quoted: m })
+      return conn.sendMessage(chat, { text: '⚠️ Número inválido. Ej: .pfp 525644444644' }, { quoted: m })
     }
   }
 
-  if (!who) {
-    who = m.key?.participant || jid
+  if (!target) {
+    target = m.key?.participant || chat
   }
 
-  const cleaned = clean(who)
-  const jidWho = cleaned + '@s.whatsapp.net'
+  const number = clean(target)
+  const fullJid = number + '@s.whatsapp.net'
 
   try {
-    const ppUrl = await conn.profilePictureUrl(jidWho, 'image')
-    await conn.sendMessage(jid, { text: '📸 Guardando foto...' }, { quoted: m })
-    await conn.updateProfilePicture(conn.user?.id || conn.user?.jid, { url: ppUrl }).catch(() => {})
-    await conn.sendMessage(jid, {
-      image: { url: ppUrl },
-      caption: `Foto de @${cleaned}`,
-      mentions: [jidWho]
-    }, { quoted: m })
+    const ppUrl = await conn.profilePictureUrl(fullJid, 'image')
+    const res = await fetch(ppUrl)
+    const buffer = Buffer.from(await res.arrayBuffer())
+
+    await conn.sendMessage(chat, { text: '📸 Guardando foto...' }, { quoted: m })
+    await conn.updateProfilePicture(botJid, buffer).catch(() => {})
+    await conn.sendMessage(chat, { image: buffer, caption: `Foto de @${number}` }, { quoted: m })
   } catch (e) {
-    await conn.sendMessage(jid, {
-      text: `👤 @${cleaned} no tiene foto de perfil o es privada`,
-      mentions: [jidWho]
+    console.log('pfp error:', e)
+    await conn.sendMessage(chat, {
+      text: `👤 @${number} no tiene foto de perfil o es privada`,
+      mentions: [fullJid]
     }, { quoted: m })
   }
 }
