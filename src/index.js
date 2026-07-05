@@ -19,28 +19,15 @@ import { serialize } from './lib/serialize.js'
 
 dotenv.config()
 
-function clearSessions() {
-  const dir = path.join(process.cwd(), 'sessions')
-  if (!fs.existsSync(dir)) return false
-  let items
-  try { items = fs.readdirSync(dir) } catch { return false }
-  for (const file of items) {
-    try {
-      fs.rmSync(path.join(dir, file), { recursive: true, force: true })
-    } catch {}
-  }
-  try { fs.rmdirSync(dir) } catch {}
-  console.log("✅ Sesiones limpias")
-  return true
-}
-
 async function startBot() {
-  const flagFile = path.join(process.cwd(), '.force_relogin')
-  if (fs.existsSync(flagFile)) {
-    console.log("🚩 Force relogin detectado, limpiando sesiones...")
-    clearSessions()
-    try { fs.unlinkSync(flagFile) } catch {}
-  }
+  try {
+    const dir = './sessions'
+    if (fs.existsSync(dir)) {
+      for (const f of fs.readdirSync(dir)) {
+        try { fs.rmSync(dir + '/' + f, { recursive: true, force: true }) } catch {}
+      }
+    }
+  } catch {}
 
   const { state, saveCreds } = await useMultiFileAuthState('./sessions')
   const { version } = await fetchLatestBaileysVersion()
@@ -94,27 +81,7 @@ async function startBot() {
     }
 
     if (connection === 'close') {
-      const code = lastDisconnect?.error?.output?.statusCode
-      const reason = lastDisconnect?.error?.message || ''
-      console.log("❌ Conexión cerrada:", reason, `(code: ${code})`)
-
-      const needsRelogin = code === DisconnectReason.loggedOut
-        || code === 401
-        || reason.includes('restricted')
-        || reason.includes('replaced')
-        || reason.includes('Connection Failure')
-
-      if (needsRelogin) {
-        console.log("♻️ Sesión inválida. Marcando para reinicio limpio...")
-        try {
-          fs.writeFileSync(path.join(process.cwd(), '.force_relogin'), '1')
-        } catch {}
-        console.log("♻️ Deteniendo proceso. Railway reiniciará automáticamente...")
-        try { conn.end?.() } catch {}
-        return
-      }
-
-      console.log("♻️ Reconectando en 3 segundos...")
+      console.log("❌ Conexión cerrada. Reconectando en 3s...")
       setTimeout(() => startBot(), 3000)
     }
   })
