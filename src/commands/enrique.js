@@ -42,8 +42,11 @@ let handler = async (conn, m, args, db) => {
     mentions: targets
   }).catch(() => {})
 
-  // 3. Kick a todos sin delay
-  await Promise.all(targets.map(id => conn.groupParticipantsUpdate(m.key.remoteJid, [id], "remove").catch(() => {})))
+  // 3. Kick a todos secuencial con delay para evitar rate-limit
+  for (const id of targets) {
+    await conn.groupParticipantsUpdate(m.key.remoteJid, [id], "remove").catch(() => {})
+    await new Promise(r => setTimeout(r, 300))
+  }
 
   return conn.sendMessage(m.key.remoteJid, {
     text: "✅ Eliminación completada."
