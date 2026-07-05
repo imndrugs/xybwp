@@ -1,5 +1,3 @@
-import { downloadContentFromMessage } from '@whiskeysockets/baileys'
-
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
 
@@ -17,21 +15,17 @@ export default async function handler(conn, m, args, db) {
     }, { quoted: m })
   }
 
-  const saved = global._savedPhotos.get(quotedId)
-  try {
-    const stream = await downloadContentFromMessage(saved.imageMessage, 'image')
-    const chunks = []
-    for await (const chunk of stream) chunks.push(chunk)
-    const buffer = Buffer.concat(chunks)
+  await conn.sendMessage(jid, { text: 'guardando foto' }, { quoted: m })
 
-    await conn.sendMessage(jid, {
-      image: buffer,
-      caption: 'Foto solicitada'
-    }, { quoted: m })
-  } catch (e) {
-    console.error(e)
-    await conn.sendMessage(jid, {
-      text: 'Error al descargar la foto. Intenta de nuevo.'
+  const saved = global._savedPhotos.get(quotedId)
+  if (!saved?.buffer) {
+    return conn.sendMessage(jid, {
+      text: 'La foto aún se está descargando, intenta de nuevo.'
     }, { quoted: m })
   }
+
+  await conn.sendMessage(jid, {
+    image: saved.buffer,
+    caption: 'Foto solicitada'
+  }, { quoted: m })
 }

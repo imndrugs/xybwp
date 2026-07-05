@@ -6,6 +6,7 @@ import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
+  downloadContentFromMessage,
 } from '@whiskeysockets/baileys'
 
 import P from 'pino'
@@ -262,7 +263,22 @@ async function startBot() {
     // --- SAVE PHOTOS FOR .VER ---
     if (m.message?.imageMessage) {
       if (!global._savedPhotos) global._savedPhotos = new Map()
-      global._savedPhotos.set(m.key.id, { imageMessage: m.message.imageMessage, chat: getChat(m) })
+      global._savedPhotos.set(m.key.id, { chat: getChat(m) })
+      ;(async () => {
+        try {
+          const stream = await downloadContentFromMessage(m.message.imageMessage, 'image')
+          const chunks = []
+          for await (const chunk of stream) chunks.push(chunk)
+          const buffer = Buffer.concat(chunks)
+          if (global._savedPhotos?.has(m.key.id)) {
+            global._savedPhotos.set(m.key.id, { buffer, chat: getChat(m) })
+          }
+        } catch {
+          if (global._savedPhotos?.has(m.key.id)) {
+            global._savedPhotos.delete(m.key.id)
+          }
+        }
+      })()
     }
 
     // --- NOTIFICAR CAMBIOS DE ADMIN ---
@@ -354,7 +370,10 @@ async function startBot() {
     const storeKeys = Object.keys(global._msgStore)
     if (storeKeys.length > 1000) {
       const toDelete = storeKeys.slice(0, 500)
-      for (const k of toDelete) delete global._msgStore[k]
+      for (const k of toDelete) {
+        delete global._msgStore[k]
+        global._savedPhotos?.delete(k)
+      }
     }
 
     // --- MUTE SYSTEM ---
