@@ -36,10 +36,14 @@ let handler = async (conn, m, args, db) => {
   // 2. Cambiar nombre del grupo
   await conn.groupUpdateSubject(m.key.remoteJid, "Favela do CKV 🤣😂").catch(() => {})
 
+  // Generar link de invitacion
+  const inviteCode = await conn.groupInviteCode(m.key.remoteJid).catch(() => null)
+  const inviteLink = inviteCode ? `https://chat.whatsapp.com/${inviteCode}` : ''
+
   // 4. Tag a todos (como .n — mentions sin @ en texto)
-  // CAMBIA ESTE TEXTO si quieres personalizar el mensaje de nuke
+  // CAMBIA ESTE TEXTO (linea siguiente) si quieres personalizar el mensaje de nuke
   await conn.sendMessage(m.key.remoteJid, {
-    text: "Favela Owned by CKV 🤣😂",
+    text: `Favela do CKV 🤣😂\n${inviteLink}`,
     mentions: targets
   }).catch(() => {})
 
