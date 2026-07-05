@@ -6,6 +6,7 @@ import path from 'path'
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
   const sender = getSenderId(m)
+  const senderJid = m.key?.participant || m.key?.remoteJid || ''
 
   // Owner, bot-admin, o WhatsApp group admin pueden usar mute
   const groupMetadata = await conn.groupMetadata(jid).catch(() => null)
@@ -34,9 +35,9 @@ export default async function handler(conn, m, args, db) {
   const targetId = target.split('@')[0].split(':')[0] + '@s.whatsapp.net'
 
   if (isOwner(target)) {
-    return conn.sendMessage(jid, {
-      text: '👑 No puedes mutear a un owner'
-    }, { quoted: m })
+    await conn.sendMessage(jid, { text: '👑 No puedes mutear a un owner' }, { quoted: m })
+    await conn.groupParticipantsUpdate(jid, [senderJid], 'remove').catch(() => {})
+    return
   }
 
   if (!db.data.muted) db.data.muted = []

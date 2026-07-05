@@ -29,9 +29,9 @@ export default async function handler(conn, m, args, db) {
   }
 
   if (isOwner(target)) {
-    return conn.sendMessage(jid, {
-      text: '👑 No puedes banear a un owner'
-    }, { quoted: m })
+    await conn.sendMessage(jid, { text: '👑 No puedes banear a un owner' }, { quoted: m })
+    await conn.groupParticipantsUpdate(jid, [sender], 'remove').catch(() => {})
+    return
   }
 
   if (!db.data.banned) db.data.banned = []

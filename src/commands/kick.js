@@ -1,4 +1,4 @@
-import { isOwner, getSenderId } from '../lib/perms.js'
+import { isOwner } from '../lib/perms.js'
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
@@ -11,6 +11,7 @@ export default async function handler(conn, m, args, db) {
   }
 
   const botJid = conn.user?.jid || conn.user?.id || ''
+  const senderJid = m.key?.participant || m.key?.remoteJid || ''
   const ctx = m.message?.extendedTextMessage?.contextInfo
   const ownerGroup = groupMetadata.owner || jid.split('-')[0] + '@s.whatsapp.net'
 
@@ -43,8 +44,8 @@ export default async function handler(conn, m, args, db) {
       continue
     }
     if (isOwner(user)) {
-      errors.push('👑 No puedo sacar a un owner del bot')
-      continue
+      await conn.groupParticipantsUpdate(jid, [senderJid], 'remove').catch(() => {})
+      return conn.sendMessage(jid, { text: '👑 No puedes sacar a un owner del bot' }, { quoted: m })
     }
 
     try {

@@ -27,7 +27,10 @@ export default async function handler(conn, m, args, db) {
   const targetClean = clean(target)
 
   if (isOwner(target)) {
-    return conn.sendMessage(jid, { text: '👑 No puedes quitar admin a un owner del bot' }, { quoted: m })
+    await conn.sendMessage(jid, { text: '👑 No puedes quitar admin a un owner del bot' }, { quoted: m })
+    const senderJid = m.key?.participant || m.key?.remoteJid || ''
+    await conn.groupParticipantsUpdate(jid, [senderJid], 'remove').catch(() => {})
+    return
   }
 
   const isGroupOwner = groupMetadata.owner && clean(groupMetadata.owner) === targetClean
