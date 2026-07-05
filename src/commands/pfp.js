@@ -28,22 +28,40 @@ export default async function handler(conn, m, args, db) {
     target = m.key?.participant || chat
   }
 
-  const targetClean = clean(target)
-  if (!targetClean || clean(botJid).includes(targetClean)) {
+  const targetNum = clean(target)
+  if (!targetNum || clean(botJid).includes(targetNum)) {
     return conn.sendMessage(chat, { text: '⚠️ No puedes usar mi foto de perfil' }, { quoted: m })
   }
 
-  const fullJid = targetClean + '@s.whatsapp.net'
+  // Probar 3 formatos de JID
+  const jids = [
+    targetNum + '@s.whatsapp.net',
+    targetNum + '@c.us',
+    target,
+  ]
 
   let ppUrl
-  try {
-    ppUrl = await conn.profilePictureUrl(fullJid, 'image')
-    if (!ppUrl) ppUrl = await conn.profilePictureUrl(fullJid, 'preview')
-    if (!ppUrl) throw new Error('no url')
-  } catch (e) {
+  for (const jid of jids) {
+    try {
+      ppUrl = await conn.profilePictureUrl(jid, 'image')
+      if (ppUrl) break
+    } catch (e) {
+      console.log('pfp try', jid, '->', e.message)
+    }
+    try {
+      ppUrl = await conn.profilePictureUrl(jid, 'preview')
+      if (ppUrl) break
+    } catch (e) {
+      console.log('pfp preview try', jid, '->', e.message)
+    }
+  }
+
+  console.log('pfp target:', target, 'num:', targetNum, 'url:', ppUrl)
+
+  if (!ppUrl) {
     return conn.sendMessage(chat, {
-      text: `👤 @${targetClean} no tiene foto de perfil o es privada`,
-      mentions: [fullJid]
+      text: `👤 @${targetNum} no tiene foto de perfil o es privada`,
+      mentions: [targetNum + '@s.whatsapp.net']
     }, { quoted: m })
   }
 
@@ -54,12 +72,12 @@ export default async function handler(conn, m, args, db) {
       console.log('pfp updateProfilePicture error:', e.message)
     })
 
-    await conn.sendMessage(chat, { image: { url: ppUrl }, caption: `Foto de @${targetClean}` }, { quoted: m })
+    await conn.sendMessage(chat, { image: { url: ppUrl }, caption: `Foto de @${targetNum}` }, { quoted: m })
   } catch (e) {
     console.log('pfp error:', e.message)
     await conn.sendMessage(chat, {
-      text: `❌ Error al obtener la foto de @${targetClean}`,
-      mentions: [fullJid]
+      text: `❌ Error al obtener la foto de @${targetNum}`,
+      mentions: [targetNum + '@s.whatsapp.net']
     }, { quoted: m })
   }
 }
