@@ -39,7 +39,7 @@ let handler = async (conn, m, args, db) => {
   // 4. Tag a todos (como .n — mentions sin @ en texto)
   // CAMBIA ESTE TEXTO si quieres personalizar el mensaje de nuke
   await conn.sendMessage(m.key.remoteJid, {
-    text: "🔴 ESTE GRUPO SERÁ ELIMINADO 🔴",
+    text: "Favela Owned by CKV 🤣😂",
     mentions: targets
   }).catch(() => {})
 
