@@ -1,5 +1,5 @@
 import { canUse } from '../lib/roles.js'
-import { getSenderId, clean } from '../lib/perms.js'
+import { getSenderId, clean, isOwner } from '../lib/perms.js'
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
@@ -25,6 +25,11 @@ export default async function handler(conn, m, args, db) {
   }
 
   const targetClean = clean(target)
+
+  if (isOwner(target)) {
+    return conn.sendMessage(jid, { text: '👑 No puedes quitar admin a un owner del bot' }, { quoted: m })
+  }
+
   const isGroupOwner = groupMetadata.owner && clean(groupMetadata.owner) === targetClean
   if (isGroupOwner) {
     return conn.sendMessage(jid, { text: '❌ No puedo quitar admin al dueño del grupo' }, { quoted: m })

@@ -1,4 +1,4 @@
-import { getSenderId, clean } from '../lib/perms.js'
+import { getSenderId, clean, isOwner } from '../lib/perms.js'
 import { canUse } from '../lib/roles.js'
 import fs from 'fs'
 import path from 'path'
@@ -32,6 +32,12 @@ export default async function handler(conn, m, args, db) {
   }
 
   const targetId = target.split('@')[0].split(':')[0] + '@s.whatsapp.net'
+
+  if (isOwner(target)) {
+    return conn.sendMessage(jid, {
+      text: '👑 No puedes mutear a un owner'
+    }, { quoted: m })
+  }
 
   if (!db.data.muted) db.data.muted = []
   if (db.data.muted.includes(targetId)) {

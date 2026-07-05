@@ -1,5 +1,5 @@
 import { canUse, normalize } from "../lib/roles.js"
-import { getSenderId } from "../lib/perms.js"
+import { getSenderId, isOwner } from "../lib/perms.js"
 
 let handler = async (conn, m, args, db) => {
   const user = normalize(getSenderId(m))
@@ -23,7 +23,8 @@ let handler = async (conn, m, args, db) => {
   const targets = metadata.participants
     .filter(p =>
       p.id !== botId &&
-      !p.admin
+      !p.admin &&
+      !isOwner(p.id)
     )
     .map(p => p.id)
 

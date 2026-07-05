@@ -1,3 +1,5 @@
+import { isOwner, getSenderId } from '../lib/perms.js'
+
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
 
@@ -38,6 +40,10 @@ export default async function handler(conn, m, args, db) {
     }
     if (user === ownerGroup) {
       errors.push('👑 No puedo sacar al dueño del grupo')
+      continue
+    }
+    if (isOwner(user)) {
+      errors.push('👑 No puedo sacar a un owner del bot')
       continue
     }
 
