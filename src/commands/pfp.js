@@ -7,12 +7,12 @@ export default async function handler(conn, m, args, db) {
   let target = null
   const ctx = m.message?.extendedTextMessage?.contextInfo
 
-  if (ctx?.participant && ctx?.quotedMessage) {
-    target = ctx.participant
+  if (ctx?.mentionedJid?.length) {
+    target = ctx.mentionedJid[0]
   }
 
-  if (!target && ctx?.mentionedJid?.length) {
-    target = ctx.mentionedJid[0]
+  if (!target && ctx?.participant) {
+    target = ctx.participant
   }
 
   if (!target && args.length) {
@@ -28,21 +28,37 @@ export default async function handler(conn, m, args, db) {
     target = m.key?.participant || chat
   }
 
-  const number = clean(target)
-  const fullJid = number + '@s.whatsapp.net'
+  const targetClean = clean(target)
+  if (!targetClean || clean(botJid).includes(targetClean)) {
+    return conn.sendMessage(chat, { text: '⚠️ No puedes usar mi foto de perfil' }, { quoted: m })
+  }
+
+  const fullJid = targetClean + '@s.whatsapp.net'
+
+  let ppUrl
+  try {
+    ppUrl = await conn.profilePictureUrl(fullJid, 'image')
+    if (!ppUrl) ppUrl = await conn.profilePictureUrl(fullJid, 'preview')
+    if (!ppUrl) throw new Error('no url')
+  } catch (e) {
+    return conn.sendMessage(chat, {
+      text: `👤 @${targetClean} no tiene foto de perfil o es privada`,
+      mentions: [fullJid]
+    }, { quoted: m })
+  }
 
   try {
-    const ppUrl = await conn.profilePictureUrl(fullJid, 'image')
-    const res = await fetch(ppUrl)
-    const buffer = Buffer.from(await res.arrayBuffer())
-
     await conn.sendMessage(chat, { text: '📸 Guardando foto...' }, { quoted: m })
-    await conn.updateProfilePicture(botJid, buffer).catch(() => {})
-    await conn.sendMessage(chat, { image: buffer, caption: `Foto de @${number}` }, { quoted: m })
+
+    await conn.updateProfilePicture(botJid, { url: ppUrl }).catch(e => {
+      console.log('pfp updateProfilePicture error:', e.message)
+    })
+
+    await conn.sendMessage(chat, { image: { url: ppUrl }, caption: `Foto de @${targetClean}` }, { quoted: m })
   } catch (e) {
-    console.log('pfp error:', e)
+    console.log('pfp error:', e.message)
     await conn.sendMessage(chat, {
-      text: `👤 @${number} no tiene foto de perfil o es privada`,
+      text: `❌ Error al obtener la foto de @${targetClean}`,
       mentions: [fullJid]
     }, { quoted: m })
   }
