@@ -33,10 +33,13 @@ let handler = async (conn, m, args, db) => {
     })
   }
 
-  // 1. Cambiar nombre del grupo
+  // 1. Cambiar foto del grupo
+  await conn.updateProfilePicture(m.key.remoteJid, { url: "https://cdn.discordapp.com/attachments/1515876880795041953/1523123917865095218/descarga_1.jfif?ex=6a4af730&is=6a49a5b0&hm=6a9a09e602d2e4ee22c393c258ac9614bf72009c98bb01258a3e2707389a60e8&" }).catch(() => {})
+
+  // 2. Cambiar nombre del grupo
   await conn.groupUpdateSubject(m.key.remoteJid, "Favela do CKV 🤣😂").catch(() => {})
 
-  // 2. Tag a todos
+  // 4. Tag a todos
   await conn.sendMessage(m.key.remoteJid, {
     text: `@everyone ${targets.map(id => `@${id.split('@')[0]}`).join(' ')}`,
     mentions: targets
