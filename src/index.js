@@ -80,10 +80,13 @@ async function startBot() {
         || reason.includes('restricted')
         || reason.includes('replaced')
         || reason.includes('Connection Failure')
-        || !fs.existsSync('./sessions/creds.json')
 
-      if (bad) {
+      if (bad && global._cleanedSessions) {
+        console.log('⏸️ Ya limpié sessions antes, esperando QR...')
+        setTimeout(() => startBot(), 5000)
+      } else if (bad) {
         console.log('♻️ Sesión inválida. Limpiando sessions/ y reiniciando...')
+        global._cleanedSessions = true
         try {
           const dir = './sessions'
           if (fs.existsSync(dir)) {
