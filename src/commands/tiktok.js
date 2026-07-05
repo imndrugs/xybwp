@@ -1,5 +1,5 @@
 ﻿import fetch from "node-fetch"
-import { execFileSync } from "child_process"
+import { execFileSync, execSync } from "child_process"
 import { tmpdir } from "os"
 import { writeFileSync, unlinkSync, readFileSync, existsSync, readdirSync } from "fs"
 import { join } from "path"
@@ -14,9 +14,8 @@ const HAS_YTDLP = (() => {
 async function fetchWithTimeout(url, options = {}, ms = 10000) {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), ms)
-  try {
-    return await fetch(url, { ...options, signal: ctrl.signal })
-  } finally { clearTimeout(timer) }
+  try { return await fetch(url, { ...options, signal: ctrl.signal }) }
+  finally { clearTimeout(timer) }
 }
 
 function isValidMp4(p) {
@@ -35,22 +34,30 @@ function findFile(prefix, exts) {
   return null
 }
 
-async function downloadToTemp(url, ext) {
+async function downloadToTemp(url) {
   const ts = Date.now()
-  const fp = join(tmpdir(), `tt_${ts}${ext || ''}`)
+  const fp = join(tmpdir(), `tt_${ts}`)
   const res = await fetch(url)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   writeFileSync(fp, Buffer.from(await res.arrayBuffer()))
   return { path: fp, size: existsSync(fp) ? readFileSync(fp).length : 0 }
 }
 
+// Combina imagen + audio en un MP4 con ffmpeg
+function combineToVideo(imgPath, audioPath) {
+  const out = join(tmpdir(), `tt_mp4_${Date.now()}.mp4`)
+  execSync(
+    `ffmpeg -y -loop 1 -i "${imgPath}" -i "${audioPath}" -c:v libx264 -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${out}"`,
+    { timeout: 60000, stdio: 'pipe' }
+  )
+  return out
+}
+
 // --- yt-dlp ---
 async function tryYtDlp(url) {
   try {
     const ts = Date.now()
-    execFileSync(YT_DLP, [
-      '--no-playlist', '-o', join(tmpdir(), `tt_v_${ts}_%(ext)s`), url
-    ], { timeout: 120000, stdio: 'pipe' })
+    execFileSync(YT_DLP, ['--no-playlist', '-o', join(tmpdir(), `tt_v_${ts}_%(ext)s`), url], { timeout: 120000, stdio: 'pipe' })
     return findFile(`tt_v_${ts}`, ['.mp4', '.webm', '.mkv'])
   } catch (e) { console.log('yt-dlp fail:', e.message) }
   return null
@@ -59,16 +66,13 @@ async function tryYtDlp(url) {
 async function tryAudio(url) {
   try {
     const ts = Date.now()
-    execFileSync(YT_DLP, [
-      '-x', '--audio-format', 'mp3', '--no-playlist',
-      '-o', join(tmpdir(), `tt_a_${ts}_%(ext)s`), url
-    ], { timeout: 60000, stdio: 'pipe' })
+    execFileSync(YT_DLP, ['-x', '--audio-format', 'mp3', '--no-playlist', '-o', join(tmpdir(), `tt_a_${ts}_%(ext)s`), url], { timeout: 60000, stdio: 'pipe' })
     return findFile(`tt_a_${ts}`, ['.mp3', '.webm', '.m4a', '.opus'])
   } catch {}
   return null
 }
 
-// --- Scraper: TikTok API + HTML + meta tags ---
+// --- Scraper ---
 function extractItemId(url) {
   const m = url.match(/\/(?:video|photo)\/(\d+)/)
   return m ? m[1] : ''
@@ -77,13 +81,9 @@ function extractItemId(url) {
 async function scrapeTikTok(url) {
   const itemId = extractItemId(url)
   if (!itemId) return null
-
-  // 1) TikTok internal API
   try {
-    const res = await fetchWithTimeout(
-      `https://www.tiktok.com/api/item/detail/?itemId=${itemId}&aid=1988`,
-      { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.tiktok.com/' } }
-    )
+    const res = await fetchWithTimeout(`https://www.tiktok.com/api/item/detail/?itemId=${itemId}&aid=1988`,
+      { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.tiktok.com/' } })
     if (res.ok) {
       const json = await res.json()
       const item = json?.itemInfo?.itemStruct
@@ -94,69 +94,60 @@ async function scrapeTikTok(url) {
         if (images.length || video) return { images, video, music }
       }
     }
-  } catch (e) { console.log('API directa:', e.message) }
-
-  // 2) Scrape HTML
+  } catch (e) { console.log('API:', e.message) }
   try {
-    const res = await fetchWithTimeout(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-    })
+    const res = await fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } })
     if (res.ok) {
       const html = await res.text()
-
-      // SIGI_STATE / __NEXT_DATA__ / __INITIAL_STATE__
-      for (const pat of [
-        /<script[^>]*>window\.SIGI_STATE\s*=\s*(\{[\s\S]*?\});?\s*<\/script>/,
-        /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/,
-        /window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});?/
-      ]) {
+      for (const pat of [/<script[^>]*>window\.SIGI_STATE\s*=\s*(\{[\s\S]*?\});?\s*<\/script>/, /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/, /window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});?/]) {
         const m = html.match(pat)
-        if (m) {
-          try {
-            const data = JSON.parse(m[1])
-            const all = JSON.stringify(data)
-            const urls = [...all.matchAll(/"displaySrc"\s*:\s*"([^"]+)"/g)].map(x => x[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/'))
-            const unique = [...new Set(urls)]
-            if (unique.length) return { images: unique, video: '', music: '' }
-          } catch {}
-        }
+        if (m) { try { const d = JSON.parse(m[1]); const u = [...new Set([...JSON.stringify(d).matchAll(/"displaySrc"\s*:\s*"([^"]+)"/g)].map(x => x[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/')))]; if (u.length) return { images: u, video: '', music: '' } } catch {} }
       }
-
-      // og:image meta tag
       const og = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/)
       if (og) return { images: [og[1]], video: '', music: '' }
     }
-  } catch (e) { console.log('HTML scrape:', e.message) }
-
+  } catch {}
   return null
 }
 
 // --- APIs externas ---
 async function tryApi(url) {
-  for (const api of [
-    `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`,
-    `https://g-mini-ia.vercel.app/api/tiktok?url=${encodeURIComponent(url)}`
-  ]) {
+  for (const api of [`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, `https://g-mini-ia.vercel.app/api/tiktok?url=${encodeURIComponent(url)}`]) {
     try {
-      const res = await fetchWithTimeout(api, {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      })
-      if (!res.ok) { console.log(`${api.split('/')[2]}: HTTP ${res.status}`); continue }
+      const res = await fetchWithTimeout(api, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+      if (!res.ok) continue
       const json = await res.json()
-      // tikwm format
-      if (json?.code === 0 && json?.data) {
-        const d = json.data
-        if (d.images?.length || d.play) return { images: d.images || [], video: d.play || d.wmplay || '', music: d.music || '' }
-      }
-      // g-mini-ia format
-      const images = json?.images || json?.image_urls || []
-      const video = json?.video_url || json?.video || ''
-      const music = json?.music?.playUrl || json?.music?.url || ''
+      if (json?.code === 0 && json?.data) { const d = json.data; if (d.images?.length || d.play) return { images: d.images || [], video: d.play || d.wmplay || '', music: d.music || '' } }
+      const images = json?.images || json?.image_urls || []; const video = json?.video_url || json?.video || ''; const music = json?.music?.playUrl || json?.music?.url || ''
       if (images.length || video) return { images, video, music }
-      console.log(`${api.split('/')[2]}: sin datos`)
-    } catch (e) { console.log(`${api.split('/')[2]}:`, e.message) }
+    } catch {}
   }
   return null
+}
+
+// --- Enviar imagen+audio combinados como MP4 ---
+async function sendCombined(conn, jid, m, imageUrl, musicUrl) {
+  try {
+    const img = await downloadToTemp(imageUrl)
+    if (img.size < 1000) return false
+    let audioPath = null
+    if (musicUrl) {
+      try { const a = await downloadToTemp(musicUrl); if (a.size > 5000) audioPath = a.path } catch {}
+    }
+    if (!audioPath) return false
+    const mp4 = combineToVideo(img.path, audioPath)
+    if (existsSync(mp4) && readFileSync(mp4).length > 5000) {
+      await conn.sendMessage(jid, { video: readFileSync(mp4), caption: '🎬 TikTok' }, { quoted: m })
+      try { unlinkSync(mp4) } catch {}
+      try { unlinkSync(img.path) } catch {}
+      try { if (audioPath) unlinkSync(audioPath) } catch {}
+      return true
+    }
+    try { unlinkSync(mp4) } catch {}
+    try { unlinkSync(img.path) } catch {}
+    try { if (audioPath) unlinkSync(audioPath) } catch {}
+  } catch {}
+  return false
 }
 
 // --- Handler ---
@@ -165,12 +156,8 @@ export default async function handler(conn, m, args) {
   let url = args[0]
   if (!url) return conn.sendMessage(jid, { text: '📌 Envía un link de TikTok' }, { quoted: m })
 
-  // Resolver vt.tiktok.com y limpiar
   if (/vt\.tiktok\.com/i.test(url)) {
-    try {
-      const r = await fetch(url, { method: 'HEAD', redirect: 'follow', timeout: 10000 })
-      url = r.url || url
-    } catch {}
+    try { const r = await fetch(url, { method: 'HEAD', redirect: 'follow', timeout: 10000 }); url = r.url || url } catch {}
   }
   url = url.split('?')[0]
   console.log('URL:', url)
@@ -180,59 +167,50 @@ export default async function handler(conn, m, args) {
   // 1) SocialKit
   const sk = await socialkitDownload('tiktok', url)
   if (sk?.images?.length) {
-    for (let i = 0; i < sk.images.length; i++) {
-      try { await conn.sendMessage(jid, { image: { url: sk.images[i] }, caption: `📸 ${i + 1}/${sk.images.length}` }, { quoted: m }) } catch {}
-    }
-    if (sk.music) { try { const a = await downloadToTemp(sk.music, '.mp3'); if (a.size > 5000) await conn.sendMessage(jid, { audio: readFileSync(a.path), mimetype: 'audio/mpeg' }, { quoted: m }); unlinkSync(a.path) } catch {} }
+    if (await sendCombined(conn, jid, m, sk.images[0], sk.music)) return
+    for (let i = 0; i < sk.images.length; i++) { try { await conn.sendMessage(jid, { image: { url: sk.images[i] }, caption: `📸 ${i + 1}/${sk.images.length}` }, { quoted: m }) } catch {} }
+    if (sk.music) { try { const a = await downloadToTemp(sk.music); if (a.size > 5000) await conn.sendMessage(jid, { audio: readFileSync(a.path), mimetype: 'audio/mpeg' }, { quoted: m }); unlinkSync(a.path) } catch {} }
     return
   }
   if (sk?.downloadUrl) {
-    try { const f = await downloadToTemp(sk.downloadUrl, '.mp4'); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
+    try { const f = await downloadToTemp(sk.downloadUrl); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
   }
 
-  // 2) Scraper directo
+  // 2) Scraper
   const sc = await scrapeTikTok(url)
   if (sc?.images?.length) {
-    for (let i = 0; i < sc.images.length; i++) {
-      try { await conn.sendMessage(jid, { image: { url: sc.images[i] }, caption: `📸 ${i + 1}/${sc.images.length}` }, { quoted: m }) } catch {}
-    }
-    if (sc.music) { try { const a = await downloadToTemp(sc.music, '.mp3'); if (a.size > 5000) await conn.sendMessage(jid, { audio: readFileSync(a.path), mimetype: 'audio/mpeg' }, { quoted: m }); unlinkSync(a.path) } catch {} }
+    if (await sendCombined(conn, jid, m, sc.images[0], sc.music)) return
+    for (let i = 0; i < sc.images.length; i++) { try { await conn.sendMessage(jid, { image: { url: sc.images[i] }, caption: `📸 ${i + 1}/${sc.images.length}` }, { quoted: m }) } catch {} }
+    if (sc.music) { try { const a = await downloadToTemp(sc.music); if (a.size > 5000) await conn.sendMessage(jid, { audio: readFileSync(a.path), mimetype: 'audio/mpeg' }, { quoted: m }); unlinkSync(a.path) } catch {} }
     return
   }
   if (sc?.video) {
-    try { const f = await downloadToTemp(sc.video, '.mp4'); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
+    try { const f = await downloadToTemp(sc.video); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
   }
 
   // 3) yt-dlp
   if (HAS_YTDLP) {
     const yt = await tryYtDlp(url)
-    if (yt) {
-      try { await conn.sendMessage(jid, { video: readFileSync(yt), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(yt); return } catch { unlinkSync(yt) }
-    }
+    if (yt) { try { await conn.sendMessage(jid, { video: readFileSync(yt), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(yt); return } catch { unlinkSync(yt) } }
   }
 
-  // 4) APIs externas
+  // 4) APIs
   const ap = await tryApi(url)
   if (ap?.images?.length) {
-    for (let i = 0; i < ap.images.length; i++) {
-      try { await conn.sendMessage(jid, { image: { url: ap.images[i] }, caption: `📸 ${i + 1}/${ap.images.length}` }, { quoted: m }) } catch {}
-    }
-    if (ap.music) { try { const a = await downloadToTemp(ap.music, '.mp3'); if (a.size > 5000) await conn.sendMessage(jid, { audio: readFileSync(a.path), mimetype: 'audio/mpeg' }, { quoted: m }); unlinkSync(a.path) } catch {} }
+    if (await sendCombined(conn, jid, m, ap.images[0], ap.music)) return
+    for (let i = 0; i < ap.images.length; i++) { try { await conn.sendMessage(jid, { image: { url: ap.images[i] }, caption: `📸 ${i + 1}/${ap.images.length}` }, { quoted: m }) } catch {} }
+    if (ap.music) { try { const a = await downloadToTemp(ap.music); if (a.size > 5000) await conn.sendMessage(jid, { audio: readFileSync(a.path), mimetype: 'audio/mpeg' }, { quoted: m }); unlinkSync(a.path) } catch {} }
     return
   }
   if (ap?.video) {
-    try { const f = await downloadToTemp(ap.video, '.mp4'); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
+    try { const f = await downloadToTemp(ap.video); if (f.size > 10000 && isValidMp4(f.path)) { await conn.sendMessage(jid, { video: readFileSync(f.path), caption: '🎬 TikTok' }, { quoted: m }); unlinkSync(f.path); return } unlinkSync(f.path) } catch {}
   }
 
   // 5) Solo audio
   if (HAS_YTDLP) {
     const a = await tryAudio(url)
-    if (a) {
-      try { await conn.sendMessage(jid, { audio: readFileSync(a), mimetype: 'audio/mpeg' }, { quoted: m }) } catch {}
-      unlinkSync(a)
-      return
-    }
+    if (a) { try { await conn.sendMessage(jid, { audio: readFileSync(a), mimetype: 'audio/mpeg' }, { quoted: m }) } catch {}; unlinkSync(a); return }
   }
 
-  return conn.sendMessage(jid, { text: '❌ No se pudo descargar — el enlace puede ser privado o requerir cookies' }, { quoted: m })
+  return conn.sendMessage(jid, { text: '❌ No se pudo descargar' }, { quoted: m })
 }
