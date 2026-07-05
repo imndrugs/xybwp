@@ -27,8 +27,9 @@ async function startBot() {
   const conn = makeWASocket({
     version,
     auth: state,
-    printQRInTerminal: false,
-    logger: P({ level: 'silent' })
+    printQRInTerminal: true,
+    logger: P({ level: 'silent' }),
+    browser: ['Chrome', 'Edge', '120.0.0']
   })
 
   global.db = {
@@ -51,7 +52,14 @@ async function startBot() {
 
     if (qr) {
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`
-      console.log("📱 Escanea este QR (abre el link):", qrUrl)
+      console.log("")
+      console.log("╔══════════════════════════════════╗")
+      console.log("║   📱 ESCANEA EL QR PARA LOGUEAR  ║")
+      console.log("╚══════════════════════════════════╝")
+      console.log("")
+      console.log("🔗 Abre este link y escanea el código:")
+      console.log(qrUrl)
+      console.log("")
     }
 
     if (connection === 'open') {
@@ -66,11 +74,25 @@ async function startBot() {
 
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode
+      const reason = lastDisconnect?.error?.message || ''
+      console.log("❌ Conexión cerrada:", reason)
 
-      console.log("❌ Conexión cerrada")
-
-      if (code !== DisconnectReason.loggedOut) {
-        startBot()
+      if (code === DisconnectReason.loggedOut) {
+        console.log("♻️ Sesión cerrada. Borrando sesión para nuevo login...")
+        try {
+          const sessionsDir = path.join(process.cwd(), 'sessions')
+          if (fs.existsSync(sessionsDir)) {
+            fs.rmSync(sessionsDir, { recursive: true, force: true })
+            console.log("✅ Carpeta sessions eliminada")
+          }
+        } catch (e) {
+          console.log("⚠️ No se pudo borrar sessions:", e.message)
+        }
+        console.log("♻️ Iniciando nuevo login en 3 segundos...")
+        setTimeout(() => startBot(), 3000)
+      } else {
+        console.log("♻️ Reconectando en 3 segundos...")
+        setTimeout(() => startBot(), 3000)
       }
     }
   })
