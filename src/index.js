@@ -20,49 +20,15 @@ import { serialize } from './lib/serialize.js'
 dotenv.config()
 
 async function startBot() {
-  const pairingPhone = process.env.PHONE?.replace(/[^0-9]/g, '')
-  if (pairingPhone) {
-    try {
-      const dir = './sessions'
-      if (fs.existsSync(dir)) {
-        for (const f of fs.readdirSync(dir)) {
-          try { fs.rmSync(dir + '/' + f, { recursive: true, force: true }) } catch {}
-        }
-      }
-    } catch {}
-    console.log("📱 PHONE detectado, sesiones limpias para nuevo login")
-  }
-
   const { state, saveCreds } = await useMultiFileAuthState('./sessions')
   const { version } = await fetchLatestBaileysVersion()
 
   const conn = makeWASocket({
     version,
     auth: state,
-    printQRInTerminal: !process.env.PHONE,
-    logger: P({ level: 'silent' }),
-    browser: ['Chrome', 'Edge', '120.0.0']
+    printQRInTerminal: true,
+    logger: P({ level: 'silent' })
   })
-
-  if (pairingPhone) {
-    setTimeout(async () => {
-      try {
-        const code = await conn.requestPairingCode(pairingPhone)
-        console.log("")
-        console.log("╔══════════════════════════════════════════╗")
-        console.log("║   🔢 CÓDIGO DE EMPAREJAMIENTO           ║")
-        console.log("╚══════════════════════════════════════════╝")
-        console.log("")
-        console.log("📱 WhatsApp > Dispositivos vinculados")
-        console.log("   > Vincular un dispositivo")
-        console.log("")
-        console.log("🔑 Código:", code.match(/.{1,4}/g).join('-'))
-        console.log("")
-      } catch (e) {
-        console.log("⚠️ Pairing code falló, usando QR:", e.message)
-      }
-    }, 5000)
-  }
 
   global.db = {
   data: {
