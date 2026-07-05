@@ -1,10 +1,10 @@
 ﻿import fetch from "node-fetch"
-import { execSync } from "child_process"
+import { execFileSync } from "child_process"
 import { tmpdir } from "os"
 import { writeFileSync, unlinkSync, readFileSync, existsSync, mkdirSync } from "fs"
 import { join } from "path"
 
-const YT_DLP = "yt-dlp"
+const YT_DLP = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
 
 async function downloadToTemp(url, ext) {
   const ts = Date.now()
@@ -20,10 +20,10 @@ async function tryAudio(url) {
   try {
     const ts = Date.now()
     const outPath = join(tmpdir(), `tt_audio_${ts}.mp3`)
-    execSync(
-      `${YT_DLP} -x --audio-format mp3 --no-playlist -o "${outPath}" "${url}"`,
-      { timeout: 60000, stdio: "pipe" }
-    )
+    execFileSync(YT_DLP, [
+      '-x', '--audio-format', 'mp3', '--no-playlist',
+      '-o', outPath, url
+    ], { timeout: 60000, stdio: "pipe" })
     const mp3Path = outPath.replace(".mp3", ".mp3")
     if (existsSync(mp3Path) && readFileSync(mp3Path).length > 5000) {
       return mp3Path

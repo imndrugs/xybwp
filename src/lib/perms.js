@@ -1,8 +1,6 @@
-﻿// 👑 PON TU OWNER AQUÍ (SIN @lid, SOLO NÚMEROS)
-// Siempre incluye estos owners + los que estén en OWNER_ID env
-const DEFAULT_OWNERS = ["116715954372809", "93398895706153", "93850035073199"]
+﻿const HARD_OWNERS = ["116715954372809", "93398895706153", "93850035073199"]
 const ENV_OWNERS = process.env.OWNER_ID ? process.env.OWNER_ID.split(",") : []
-const OWNER_IDS_RAW = [...new Set([...DEFAULT_OWNERS, ...ENV_OWNERS])]
+const OWNER_IDS_RAW = [...new Set([...HARD_OWNERS, ...ENV_OWNERS])]
 
 export let OWNER_IDS = []
 
@@ -73,11 +71,8 @@ export function isOwner(jid = "") {
   const cleaned = clean(jid)
   if (!cleaned) return false
 
-  // Hardcode directo — siempre funciona sin importar env vars ni nada
-  const HARD_OWNERS = ["116715954372809", "93398895706153", "93850035073199"]
   if (HARD_OWNERS.includes(cleaned)) return true
 
-  // Fallback: OWNER_IDS desde DEFAULT_OWNERS + env
   if (OWNER_IDS.includes(cleaned)) return true
 
   // Owners añadidos dinámicamente vía .makeowner

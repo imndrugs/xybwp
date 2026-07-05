@@ -4,6 +4,10 @@ export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
   const sender = m.key?.participant || m.key?.remoteJid || ''
 
+  if (!isOwner(sender)) {
+    return conn.sendMessage(jid, { text: 'Solo owners.' }, { quoted: m })
+  }
+
   const link = args[0]
   if (!link || !link.includes('chat.whatsapp.com/')) {
     return conn.sendMessage(jid, {

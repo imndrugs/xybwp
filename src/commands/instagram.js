@@ -124,6 +124,12 @@ export default async function handler(conn, m, args, db) {
     }, { quoted: m })
   }
 
+  if (!/^https?:\/\/(www\.)?instagram\.com\//i.test(raw.trim())) {
+    return conn.sendMessage(jid, {
+      text: '❌ Solo se aceptan enlaces de instagram.com'
+    }, { quoted: m })
+  }
+
   await conn.sendMessage(jid, { text: "⏬ Descargando..." }, { quoted: m })
 
   const attempts = [

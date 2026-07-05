@@ -12,6 +12,7 @@ import P from 'pino'
 import dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import { execSync } from 'child_process'
 import { isBanned } from './lib/perms.js'
 
@@ -87,18 +88,7 @@ async function startBot() {
 
   function saveDB() {
     try {
-      const toSave = {
-        contacts: global.db.contacts || {},
-        data: {
-          admins: global.db.data?.admins || [],
-          muted: global.db.data?.muted || [],
-          antivirgenes: global.db.data?.antivirgenes || [],
-          banned: global.db.data?.banned || [],
-          autoresponder: global.db.data?.autoresponder || {},
-          afk: global.db.data?.afk || {}
-        }
-      }
-      fs.writeFileSync(dataFile, JSON.stringify(toSave, null, 2))
+      fs.writeFileSync(dataFile, JSON.stringify({ contacts: global.db.contacts || {} }, null, 2))
     } catch {}
   }
 
@@ -115,6 +105,12 @@ async function startBot() {
   global._snipes = {}
   global._extraOwners = []
   global._disabledCmds = new Map()
+  const _cmdsDir = path.dirname(fileURLToPath(import.meta.url))
+  global._validCommands = new Set(
+    fs.readdirSync(path.join(_cmdsDir, 'commands'))
+      .filter(f => f.endsWith('.js'))
+      .map(f => f.replace(/\.js$/, ''))
+  )
 
   loadDB()
 
@@ -462,6 +458,11 @@ async function startBot() {
     }
 
     const commandName = cmd.replace(/^[.!]/, '')
+
+    // --- VALIDATE COMMAND against known files ---
+    if (commandName !== 's' && commandName !== 'sticker' && commandName !== 'n' && commandName !== 'notify' && !global._validCommands?.has(commandName)) {
+      return
+    }
 
     // --- DISABLED COMMANDS CHECK ---
     if (commandName !== 'cmdoff' && commandName !== 'cmdon' && global._disabledCmds?.has(commandName)) {
