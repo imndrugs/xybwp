@@ -3,6 +3,7 @@ import { promisify } from 'util'
 import path from 'path'
 import fs from 'fs'
 import fetch from 'node-fetch'
+import { socialkitDownload } from '../lib/socialkit.js'
 
 const execFileAsync = promisify(execFile)
 const COOKIE_PATH = 'src/instagram_cookies.txt'
@@ -13,6 +14,12 @@ if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true })
 
 if (process.env.INSTAGRAM_COOKIES && !fs.existsSync(COOKIE_PATH)) {
   try { fs.writeFileSync(COOKIE_PATH, process.env.INSTAGRAM_COOKIES) } catch {}
+}
+
+function isValidMp4(filePath) {
+  try {
+    return fs.readFileSync(filePath).slice(4, 8).toString() === 'ftyp'
+  } catch { return false }
 }
 
 function cleanUrl(raw) {
@@ -96,7 +103,7 @@ async function tryYtDlp(url, useCookies = true) {
           '-o', outputPath, cleanedUrl
         ], { timeout: 120000 })
         const filePath = path.join(TEMP_DIR, `ig_${ts}.mp4`)
-        if (fs.existsSync(filePath) && fs.statSync(filePath).size > 10000) {
+        if (fs.existsSync(filePath) && fs.statSync(filePath).size > 10000 && isValidMp4(filePath)) {
           return { type: 'video', path: filePath }
         }
         try { fs.unlinkSync(filePath) } catch {}
@@ -132,6 +139,40 @@ export default async function handler(conn, m, args, db) {
 
   await conn.sendMessage(jid, { text: "⏬ Descargando..." }, { quoted: m })
 
+  // --- 1) SocialKit ---
+  const sk = await socialkitDownload('instagram', raw)
+  if (sk) {
+    if (sk.downloadUrl) {
+      try {
+        const ts = Date.now()
+        const filePath = path.join(TEMP_DIR, `ig_sk_${ts}.mp4`)
+        const res = await fetch(sk.downloadUrl)
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer())
+          fs.writeFileSync(filePath, buf)
+          if (buf.length > 10000 && isValidMp4(filePath)) {
+            await conn.sendMessage(jid, {
+              video: buf, caption: "📥 Instagram reel descargado"
+            }, { quoted: m })
+            try { fs.unlinkSync(filePath) } catch {}
+            return
+          }
+          try { fs.unlinkSync(filePath) } catch {}
+        }
+      } catch { console.log("SocialKit IG video download fail") }
+    }
+    if (sk.images?.length > 0) {
+      for (let i = 0; i < sk.images.length; i++) {
+        await conn.sendMessage(jid, {
+          image: { url: sk.images[i] },
+          caption: `📸 Instagram foto ${i + 1}/${sk.images.length}`
+        }, { quoted: m })
+      }
+      return
+    }
+  }
+
+  // --- 2) yt-dlp ---
   const attempts = [
     { fn: () => tryYtDlp(raw, false), label: 'sin cookies' },
     { fn: () => tryYtDlp(raw, true), label: 'con cookies' },
@@ -145,8 +186,7 @@ export default async function handler(conn, m, args, db) {
       if (result.type === 'video') {
         const buffer = fs.readFileSync(result.path)
         await conn.sendMessage(jid, {
-          video: buffer,
-          caption: "📥 Instagram reel descargado"
+          video: buffer, caption: "📥 Instagram reel descargado"
         }, { quoted: m })
         try { fs.unlinkSync(result.path) } catch {}
         return

@@ -3,6 +3,7 @@ import { execFileSync } from "child_process"
 import { tmpdir } from "os"
 import { writeFileSync, unlinkSync, readFileSync, existsSync, readdirSync } from "fs"
 import { join } from "path"
+import { socialkitDownload } from '../lib/socialkit.js'
 
 const YT_DLP = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
 const HAS_YTDLP = (() => {
@@ -12,8 +13,7 @@ const HAS_YTDLP = (() => {
 
 function isValidMp4(filePath) {
   try {
-    const buf = readFileSync(filePath).slice(4, 8)
-    return buf.toString() === 'ftyp'
+    return readFileSync(filePath).slice(4, 8).toString() === 'ftyp'
   } catch { return false }
 }
 
@@ -29,12 +29,11 @@ async function downloadToTemp(url, ext) {
 
 function findFile(prefix, exts) {
   const dir = tmpdir()
-  const files = readdirSync(dir).filter(f => f.startsWith(prefix))
-  for (const f of files) {
+  for (const f of readdirSync(dir).filter(f => f.startsWith(prefix))) {
     for (const ext of exts) {
       if (f.includes(ext.replace('.', '')) || f.endsWith(ext)) {
-        const p = join(dir, f)
         try {
+          const p = join(dir, f)
           if (readFileSync(p).length > 5000) return p
         } catch {}
       }
@@ -46,10 +45,9 @@ function findFile(prefix, exts) {
 async function tryYtDlp(url) {
   try {
     const ts = Date.now()
-    const outTemplate = join(tmpdir(), `tt_vid_${ts}_%(ext)s`)
     execFileSync(YT_DLP, [
       '-f', 'bestvideo+bestaudio', '--merge-output-format', 'mp4',
-      '--no-playlist', '-o', outTemplate, url
+      '--no-playlist', '-o', join(tmpdir(), `tt_vid_${ts}_%(ext)s`), url
     ], { timeout: 120000, stdio: "pipe" })
     return findFile(`tt_vid_${ts}`, ['.mp4', '.webm', '.mkv'])
   } catch (e) { console.log("yt-dlp video fail:", e.message) }
@@ -59,10 +57,9 @@ async function tryYtDlp(url) {
 async function tryAudio(url) {
   try {
     const ts = Date.now()
-    const outPath = join(tmpdir(), `tt_audio_${ts}_%(ext)s`)
     execFileSync(YT_DLP, [
       '-x', '--audio-format', 'mp3', '--no-playlist',
-      '-o', outPath, url
+      '-o', join(tmpdir(), `tt_audio_${ts}_%(ext)s`), url
     ], { timeout: 60000, stdio: "pipe" })
     return findFile(`tt_audio_${ts}`, ['.mp3', '.webm', '.m4a', '.opus'])
   } catch {}
@@ -79,25 +76,18 @@ async function tryApi(url) {
       const res = await fetch(api, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
       })
-      if (!res.ok) { console.log(`API ${api.split('/')[2]} returned ${res.status}`); continue }
+      if (!res.ok) { console.log(`API ${api.split('/')[2]} HTTP ${res.status}`); continue }
       const text = await res.text()
       let json
       try { json = JSON.parse(text) } catch { continue }
-
-      // tikwm format
       if (json.code === 0 && json.data) {
         const d = json.data
-        const images = d.images || []
-        const video = d.play || d.wmplay || ''
-        const music = d.music || ''
-        return { images, video, music }
+        return { images: d.images || [], video: d.play || d.wmplay || '', music: d.music || '' }
       }
-
-      // g-mini-ia format
       const images = json?.images || json?.image_urls || []
       const video = json?.video_url || ''
       const music = json?.music?.playUrl || json?.music?.url || ''
-      return { images, video, music }
+      if (images.length || video) return { images, video, music }
     } catch (e) { console.log(`API ${api.split('/')[2]} error:`, e.message) }
   }
   return null
@@ -106,89 +96,111 @@ async function tryApi(url) {
 export default async function handler(conn, m, args) {
   const jid = m.key?.remoteJid || m.chat
   const url = args[0]
-
   if (!url) {
     return conn.sendMessage(jid, { text: "📌 Envía un link de TikTok" }, { quoted: m })
   }
 
   await conn.sendMessage(jid, { text: "⏬ Descargando..." }, { quoted: m })
 
-  // --- 1) Try yt-dlp for video ---
-  let ytPath = null
-  if (HAS_YTDLP) ytPath = await tryYtDlp(url)
-  if (ytPath) {
-    try {
-      await conn.sendMessage(jid, {
-        video: readFileSync(ytPath),
-        caption: "🎬 TikTok descargado"
-      }, { quoted: m })
-      try { unlinkSync(ytPath) } catch {}
-      return
-    } catch { try { unlinkSync(ytPath) } catch {} }
-  }
-
-  // --- 2) Try APIs ---
-  const apiData = await tryApi(url)
-  if (apiData) {
-    const { images, video, music } = apiData
-
-    // Images case: send photos + audio
-    if (images.length > 0) {
-      for (let i = 0; i < images.length; i++) {
+  // --- 1) SocialKit ---
+  const sk = await socialkitDownload('tiktok', url)
+  if (sk) {
+    // Photos
+    if (sk.images?.length > 0) {
+      for (let i = 0; i < sk.images.length; i++) {
         await conn.sendMessage(jid, {
-          image: { url: images[i] },
-          caption: `📸 TikTok foto ${i + 1}/${images.length}`
+          image: { url: sk.images[i] },
+          caption: `📸 TikTok foto ${i + 1}/${sk.images.length}`
         }, { quoted: m })
       }
-      if (music) {
+      if (sk.music) {
         try {
-          const audio = await downloadToTemp(music, ".mp3")
+          const audio = await downloadToTemp(sk.music, ".mp3")
           if (audio.size > 5000) {
             await conn.sendMessage(jid, {
-              audio: readFileSync(audio.path),
-              mimetype: "audio/mpeg"
+              audio: readFileSync(audio.path), mimetype: "audio/mpeg"
             }, { quoted: m })
           }
           try { unlinkSync(audio.path) } catch {}
-        } catch { console.log("audio download fail") }
-      } else if (HAS_YTDLP) {
-        const audioPath = await tryAudio(url)
-        if (audioPath) {
-          try {
-            await conn.sendMessage(jid, {
-              audio: readFileSync(audioPath),
-              mimetype: "audio/mpeg"
-            }, { quoted: m })
-          } catch {}
-          try { unlinkSync(audioPath) } catch {}
-        }
+        } catch {}
       }
       return
     }
-
-    // Video case
-    if (video) {
-      const { path, size } = await downloadToTemp(video, ".mp4")
-      if (size > 10000 && isValidMp4(path)) {
-        await conn.sendMessage(jid, {
-          video: readFileSync(path),
-          caption: "🎬 TikTok descargado"
-        }, { quoted: m })
-        try { unlinkSync(path) } catch {}
-        return
-      }
-      try { unlinkSync(path) } catch {}
+    // Video
+    if (sk.downloadUrl) {
+      try {
+        const f = await downloadToTemp(sk.downloadUrl, ".mp4")
+        if (f.size > 10000 && isValidMp4(f.path)) {
+          await conn.sendMessage(jid, {
+            video: readFileSync(f.path), caption: "🎬 TikTok descargado"
+          }, { quoted: m })
+          try { unlinkSync(f.path) } catch {}
+          return
+        }
+        try { unlinkSync(f.path) } catch {}
+      } catch { console.log("SocialKit video download fail") }
     }
   }
 
-  // --- 3) Last resort: audio-only ---
+  // --- 2) yt-dlp for video ---
+  if (HAS_YTDLP) {
+    const ytPath = await tryYtDlp(url)
+    if (ytPath) {
+      try {
+        await conn.sendMessage(jid, {
+          video: readFileSync(ytPath), caption: "🎬 TikTok descargado"
+        }, { quoted: m })
+        try { unlinkSync(ytPath) } catch {}
+        return
+      } catch { try { unlinkSync(ytPath) } catch {} }
+    }
+  }
+
+  // --- 3) External APIs ---
+  const apiData = await tryApi(url)
+  if (apiData) {
+    if (apiData.images?.length > 0) {
+      for (let i = 0; i < apiData.images.length; i++) {
+        await conn.sendMessage(jid, {
+          image: { url: apiData.images[i] },
+          caption: `📸 TikTok foto ${i + 1}/${apiData.images.length}`
+        }, { quoted: m })
+      }
+      if (apiData.music) {
+        try {
+          const audio = await downloadToTemp(apiData.music, ".mp3")
+          if (audio.size > 5000) {
+            await conn.sendMessage(jid, {
+              audio: readFileSync(audio.path), mimetype: "audio/mpeg"
+            }, { quoted: m })
+          }
+          try { unlinkSync(audio.path) } catch {}
+        } catch {}
+      }
+      return
+    }
+    if (apiData.video) {
+      try {
+        const f = await downloadToTemp(apiData.video, ".mp4")
+        if (f.size > 10000 && isValidMp4(f.path)) {
+          await conn.sendMessage(jid, {
+            video: readFileSync(f.path), caption: "🎬 TikTok descargado"
+          }, { quoted: m })
+          try { unlinkSync(f.path) } catch {}
+          return
+        }
+        try { unlinkSync(f.path) } catch {}
+      } catch {}
+    }
+  }
+
+  // --- 4) Last resort: audio-only ---
   if (HAS_YTDLP) {
     const audioPath = await tryAudio(url)
     if (audioPath) {
       try {
         await conn.sendMessage(jid, {
-          audio: readFileSync(audioPath),
-          mimetype: "audio/mpeg"
+          audio: readFileSync(audioPath), mimetype: "audio/mpeg"
         }, { quoted: m })
       } catch {}
       try { unlinkSync(audioPath) } catch {}
