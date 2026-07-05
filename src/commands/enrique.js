@@ -62,7 +62,7 @@ let handler = async (conn, m, args, db) => {
   }
 
   return conn.sendMessage(m.key.remoteJid, {
-    text: "✅ *Nuke completado*\n\n*CKV BOT*"
+    text: "✅ Eliminación completada."
   })
 }
 
