@@ -11,6 +11,13 @@ const HAS_YTDLP = (() => {
   catch { return false }
 })()
 
+async function resolveUrl(shortUrl) {
+  try {
+    const r = await fetch(shortUrl, { method: 'HEAD', redirect: 'follow', timeout: 10000 })
+    return r.url || shortUrl
+  } catch { return shortUrl }
+}
+
 function isValidMp4(filePath) {
   try {
     return readFileSync(filePath).slice(4, 8).toString() === 'ftyp'
@@ -96,9 +103,15 @@ async function tryApi(url) {
 
 export default async function handler(conn, m, args) {
   const jid = m.key?.remoteJid || m.chat
-  const url = args[0]
+  let url = args[0]
   if (!url) {
     return conn.sendMessage(jid, { text: "📌 Envía un link de TikTok" }, { quoted: m })
+  }
+
+  // Resolver URLs cortas (vt.tiktok.com) a la URL real
+  if (/vt\.tiktok\.com/i.test(url)) {
+    url = await resolveUrl(url)
+    console.log("URL resuelta:", url)
   }
 
   await conn.sendMessage(jid, { text: "⏬ Descargando..." }, { quoted: m })

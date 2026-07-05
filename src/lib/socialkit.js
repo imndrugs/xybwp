@@ -5,10 +5,18 @@ const ENDPOINTS = {
   tiktok: [
     '/tiktok/download',
     '/tiktok',
+    '/api/tiktok/download',
+    '/api/tiktok',
+    '/v1/tiktok/download',
+    '/v2/tiktok/download',
   ],
   instagram: [
     '/instagram/download',
     '/instagram',
+    '/api/instagram/download',
+    '/api/instagram',
+    '/v1/instagram/download',
+    '/v2/instagram/download',
   ]
 }
 
@@ -23,10 +31,7 @@ export async function socialkitDownload(platform, url) {
         body: JSON.stringify({ access_key: KEY, url }),
         signal: AbortSignal.timeout(30000)
       })
-      if (!r.ok) {
-        console.log(`SocialKit ${platform} ${p}: HTTP ${r.status}`)
-        continue
-      }
+      if (!r.ok) continue
       const d = await r.json()
       const data = d?.data || d
       if (!data) continue
@@ -38,7 +43,7 @@ export async function socialkitDownload(platform, url) {
       }
       if (result.downloadUrl || result.images.length) return result
     } catch (e) {
-      console.log(`SocialKit ${platform} ${p} error:`, e.message)
+      console.log(`SocialKit ${platform} error:`, e.message)
     }
   }
   return null
