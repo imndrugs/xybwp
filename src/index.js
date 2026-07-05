@@ -19,7 +19,28 @@ import { serialize } from './lib/serialize.js'
 
 dotenv.config()
 
+function clearSessions() {
+  const dir = path.join(process.cwd(), 'sessions')
+  if (!fs.existsSync(dir)) return false
+  let items
+  try { items = fs.readdirSync(dir) } catch { return false }
+  for (const file of items) {
+    try {
+      fs.rmSync(path.join(dir, file), { recursive: true, force: true })
+    } catch {}
+  }
+  try { fs.rmdirSync(dir) } catch {}
+  console.log("✅ Sesiones limpias")
+  return true
+}
+
 async function startBot() {
+  const flagFile = path.join(process.cwd(), '.force_relogin')
+  if (fs.existsSync(flagFile)) {
+    console.log("🚩 Force relogin detectado, limpiando sesiones...")
+    clearSessions()
+    try { fs.unlinkSync(flagFile) } catch {}
+  }
 
   const { state, saveCreds } = await useMultiFileAuthState('./sessions')
   const { version } = await fetchLatestBaileysVersion()
@@ -53,11 +74,11 @@ async function startBot() {
     if (qr) {
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`
       console.log("")
-      console.log("╔══════════════════════════════════╗")
-      console.log("║   📱 ESCANEA EL QR PARA LOGUEAR  ║")
-      console.log("╚══════════════════════════════════╝")
+      console.log("╔══════════════════════════════════════════╗")
+      console.log("║   📱 ESCANEA EL QR PARA LOGUEAR         ║")
+      console.log("╚══════════════════════════════════════════╝")
       console.log("")
-      console.log("🔗 Abre este link y escanea el código:")
+      console.log("🔗 Abre este link en tu celular y escanea:")
       console.log(qrUrl)
       console.log("")
     }
@@ -75,25 +96,26 @@ async function startBot() {
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode
       const reason = lastDisconnect?.error?.message || ''
-      console.log("❌ Conexión cerrada:", reason)
+      console.log("❌ Conexión cerrada:", reason, `(code: ${code})`)
 
-      if (code === DisconnectReason.loggedOut) {
-        console.log("♻️ Sesión cerrada. Borrando sesión para nuevo login...")
+      const needsRelogin = code === DisconnectReason.loggedOut
+        || code === 401
+        || reason.includes('restricted')
+        || reason.includes('replaced')
+        || reason.includes('Connection Failure')
+
+      if (needsRelogin) {
+        console.log("♻️ Sesión inválida. Marcando para reinicio limpio...")
         try {
-          const sessionsDir = path.join(process.cwd(), 'sessions')
-          if (fs.existsSync(sessionsDir)) {
-            fs.rmSync(sessionsDir, { recursive: true, force: true })
-            console.log("✅ Carpeta sessions eliminada")
-          }
-        } catch (e) {
-          console.log("⚠️ No se pudo borrar sessions:", e.message)
-        }
-        console.log("♻️ Iniciando nuevo login en 3 segundos...")
-        setTimeout(() => startBot(), 3000)
-      } else {
-        console.log("♻️ Reconectando en 3 segundos...")
-        setTimeout(() => startBot(), 3000)
+          fs.writeFileSync(path.join(process.cwd(), '.force_relogin'), '1')
+        } catch {}
+        console.log("♻️ Deteniendo proceso. Railway reiniciará automáticamente...")
+        try { conn.end?.() } catch {}
+        return
       }
+
+      console.log("♻️ Reconectando en 3 segundos...")
+      setTimeout(() => startBot(), 3000)
     }
   })
 
