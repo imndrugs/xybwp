@@ -3,20 +3,20 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const categories = {
-  '🎮 Interactivos': ['hi', 'hola', 'bye', 'adios', 'love', 'dado', 'ppt', 'encuesta', 'top', 'frase', 'simi'],
+  '🎮 Interactivos': ['hi', 'hola', 'bye', 'adios', 'love', 'dado', 'ppt', 'encuesta', 'top', 'frase'],
   '🔥 NSFW': ['fuck', '69', 'anal', 'boobs', 'blowjob', 'pussy'],
   '🔐 STAFF': [
     'ban', 'unban', 'del', 'enrique',
     'setadmin', 'deladmin', 'makeowner',
     'cmdoff', 'cmdon', 'testowner',
-    'bc', 'setprefix', 'setname', 'setmenu', 'setwm', 'mode'
+    'bc', 'setname', 'setwm', 'mode'
   ],
   '⚙️ ADMINISTRACIÓN': [
     'admin', 'promote', 'demote',
     'kick', 'sacar', 'escupir',
     'mute', 'unmute', 'add',
     'welcome', 'goodbye', 'antilink', 'antispam',
-    'group', 'invite', 'revoke', 'setdesc',
+    'group', 'invite', 'linkrevoke', 'setdesc',
     'link', 'autoadmin', 'antivirgenes'
   ],
   '📱 Descargas': [
@@ -29,8 +29,8 @@ const categories = {
   '💬 Utilidades': [
     'ping', 'proofs', 'pfp', 'pg', 'snipe', 'id', 'version',
     'n', 'notify', 'everyone', 'todos',
-    'translate', 'short', 'wiki', 'ip', 'anime',
-    'qr', 'readqr', 'globo',
+    'translate', 'short', 'wiki', 'anime',
+    'readqr', 'globo',
     'join', 'ver', 'menu',
     'autoresponder', 'afk', 'roles',
     'igcookies', 'ytcookies'
@@ -44,9 +44,8 @@ const descriptions = {
   dado: 'Lanzar un dado 🎲',
   ppt: 'Piedra, papel o tijera',
   encuesta: 'Crear encuesta con opciones',
-  top: 'Top 10 de algo',
+  top: 'Top 10 de algo con miembros del grupo',
   frase: 'Frase célebre aleatoria',
-  simi: 'Chatear con SimSimi IA',
   fuck: 'Follar a alguien', '69': 'Acción +18',
   anal: 'Acción anal +18', boobs: 'Acción +18 senos',
   blowjob: 'Acción +18 blowjob', pussy: 'Acción +18 lamer',
@@ -59,9 +58,7 @@ const descriptions = {
   cmdoff: 'Desactivar comando', cmdon: 'Activar comando',
   testowner: 'Testear si eres owner',
   bc: 'Broadcast a todos los grupos',
-  setprefix: 'Cambiar prefijo del bot',
   setname: 'Cambiar nombre del bot',
-  setmenu: 'Cambiar estilo de menú',
   setwm: 'Configurar watermark stickers',
   mode: 'Cambiar modo public/private',
   mute: 'Silenciar usuario', unmute: 'Quitar silencio',
@@ -72,7 +69,7 @@ const descriptions = {
   antispam: 'Activar/desactivar anti-spam',
   group: 'Abrir/cerrar el grupo',
   invite: 'Link de invitación del grupo',
-  revoke: 'Revocar link de invitación',
+  linkrevoke: 'Revocar link de invitación',
   setdesc: 'Cambiar descripción del grupo',
   link: 'Link de invitación',
   autoadmin: 'Admin automático al entrar',
@@ -98,11 +95,9 @@ const descriptions = {
   translate: 'Traducir texto a español',
   short: 'Acortar URL',
   wiki: 'Buscar en Wikipedia',
-  ip: 'Información de una IP',
   anime: 'Buscar información de anime',
-  qr: 'Generar código QR',
   readqr: 'Leer código QR de una imagen',
-  globo: 'Agregar globo de texto a una imagen',
+  globo: 'Superponer imagen en globo de diálogo y enviar sticker',
   join: 'Unir bot al grupo',
   ver: 'Ver foto del chat',
   menu: 'Este menú',

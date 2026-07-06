@@ -1,13 +1,32 @@
+import axios from 'axios'
 import sharp from 'sharp'
 import { downloadMediaMessage } from '@whiskeysockets/baileys'
 import fs from 'fs'
 import path from 'path'
 
+const GLOBE_URL = 'https://cdn.discordapp.com/attachments/1517453653890437140/1523494786450067569/globo.png'
+const tmpDir = path.join(process.cwd(), 'temp')
+const globeCache = path.join(tmpDir, 'globo_overlay.png')
+
+async function getGlobeOverlay() {
+  if (fs.existsSync(globeCache)) return globeCache
+  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
+  const res = await axios.get(GLOBE_URL, {
+    responseType: 'arraybuffer',
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    timeout: 15000
+  })
+  fs.writeFileSync(globeCache, res.data)
+  return globeCache
+}
+
 export default async function handler(conn, m, args, db) {
   const chat = m.chat || m.key?.remoteJid
 
   const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage
-  const mediaMessage = quotedMsg?.imageMessage ? { message: { imageMessage: quotedMsg.imageMessage }, key: { id: m.key?.id } } : null
+  const mediaMessage = quotedMsg?.imageMessage
+    ? { message: { imageMessage: quotedMsg.imageMessage }, key: { id: m.key?.id } }
+    : null
 
   if (!mediaMessage) {
     return conn.sendMessage(chat, { text: '⚠️ Responde a una imagen con .globo' }, { quoted: m })
@@ -16,64 +35,34 @@ export default async function handler(conn, m, args, db) {
   await conn.sendMessage(chat, { text: '⏳ Procesando...' }, { quoted: m })
 
   try {
-    const buffer = await downloadMediaMessage(mediaMessage, 'buffer', {})
-    const tmp = path.join(process.cwd(), 'temp')
-    if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true })
-    const inputPath = path.join(tmp, `globo_in_${Date.now()}.jpg`)
-    const outputPath = path.join(tmp, `globo_out_${Date.now()}.jpg`)
-    fs.writeFileSync(inputPath, buffer)
+    const userBuffer = await downloadMediaMessage(mediaMessage, 'buffer', {})
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
 
-    const text = args.join(' ') || '...'
-    const maxChars = 40
-    const words = text.split(' ')
-    const lines = []
-    let current = ''
-    for (const word of words) {
-      if ((current + ' ' + word).trim().length <= maxChars) {
-        current = (current + ' ' + word).trim()
-      } else {
-        if (current) lines.push(current)
-        current = word
-      }
-    }
-    if (current) lines.push(current)
+    const globePath = await getGlobeOverlay()
+    const globeMeta = await sharp(globePath).metadata()
+    const gw = globeMeta.width
+    const gh = globeMeta.height
 
-    const lineH = 30
-    const padX = 20
-    const padY = 15
-    const bubbleH = lines.length * lineH + padY * 2
-    const svgWidth = 600
+    const userResized = await sharp(userBuffer)
+      .resize(gw, gh, { fit: 'cover', position: 'centre' })
+      .png()
+      .toBuffer()
 
-    const svgLines = lines.map((l, i) =>
-      `<tspan x="${svgWidth / 2}" dy="${i === 0 ? 0 : lineH}">${escXml(l)}</tspan>`
-    ).join('')
+    const outputPath = path.join(tmpDir, `globo_out_${Date.now()}.webp`)
 
-    const svg = Buffer.from(`<svg width="${svgWidth}" height="${bubbleH}">
-      <rect x="0" y="0" width="${svgWidth}" height="${bubbleH}" rx="15" ry="15" fill="white" stroke="#333" stroke-width="3"/>
-      <text x="${svgWidth / 2}" y="${padY + lineH - 5}" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="black">${svgLines}</text>
-    </svg>`)
-
-    const img = sharp(inputPath)
-    const meta = await img.metadata()
-    const newH = meta.height + bubbleH + 10
-    const bg = await sharp({
-      create: { width: Math.max(meta.width, svgWidth), height: newH, channels: 3, background: { r: 255, g: 255, b: 255 } }
+    await sharp({
+      create: { width: gw, height: gh, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
     })
       .composite([
-        { input: svg, top: 0, left: Math.max(0, Math.floor((Math.max(meta.width, svgWidth) - svgWidth) / 2)) },
-        { input: inputPath, top: bubbleH + 10, left: 0 }
+        { input: userResized, top: 0, left: 0 },
+        { input: globePath, top: 0, left: 0 },
       ])
-      .jpeg({ quality: 90 })
+      .webp({ quality: 90 })
       .toFile(outputPath)
 
-    await conn.sendMessage(chat, { image: { url: outputPath }, caption: '💬 *CKV BOT*' }, { quoted: m })
-    try { fs.unlinkSync(inputPath) } catch {}
+    await conn.sendMessage(chat, { sticker: { url: outputPath } }, { quoted: m })
     try { fs.unlinkSync(outputPath) } catch {}
   } catch (e) {
-    conn.sendMessage(chat, { text: `❌ Error: ${e.message}` }, { quoted: m })
+    conn.sendMessage(chat, { text: `❌ Error: ${e.message?.slice(0, 100)}` }, { quoted: m })
   }
-}
-
-function escXml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
