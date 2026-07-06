@@ -11,7 +11,7 @@ let handler = async (conn, m, args, db) => {
     })
   }
 
-  const botId = (conn.user?.id || conn.user?.jid || '').split(':')[0]
+  const botId = clean(conn.user?.id || conn.user?.jid || '')
 
   const metadata = await conn.groupMetadata(m.key.remoteJid).catch(() => null)
   if (!metadata?.participants?.length) {
@@ -24,11 +24,11 @@ let handler = async (conn, m, args, db) => {
 
   const targets = metadata.participants
     .filter(p => {
-      const pid = (p.id || '').split(':')[0]
+      const pid = clean(p.id)
       return pid !== botId
         && !isOwner(p.id)
         && !isAdmin(p.id, db)
-        && clean(p.id) !== senderClean
+        && pid !== senderClean
     })
     .map(p => p.id)
 
