@@ -51,8 +51,15 @@ export default async function handler(conn, m, args, db) {
     console.log('[globo] Pixeles oscuros (outline):', darkPixels, 'de', gw * gh)
 
     console.log('[globo] Reconstruyendo globo con alpha...')
-    const globeOutline = await sharp(raw, { raw: { width: gw, height: gh, channels: 3 } })
-      .joinChannel(alpha).png().toBuffer()
+    const rgba = Buffer.alloc(gw * gh * 4)
+    for (let i = 0; i < gw * gh; i++) {
+      rgba[i * 4] = raw[i * 3]
+      rgba[i * 4 + 1] = raw[i * 3 + 1]
+      rgba[i * 4 + 2] = raw[i * 3 + 2]
+      rgba[i * 4 + 3] = alpha[i]
+    }
+    const globeOutline = await sharp(rgba, { raw: { width: gw, height: gh, channels: 4 } })
+      .png().toBuffer()
     console.log('[globo] globeOutline tamaño:', globeOutline.length)
 
     const tmp = path.join(process.cwd(), 'temp')
