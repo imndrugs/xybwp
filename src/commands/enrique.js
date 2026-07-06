@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { canUse, normalize } from "../lib/roles.js"
 import { getSenderId, isOwner, isAdmin, clean } from "../lib/perms.js"
 
@@ -43,7 +44,14 @@ let handler = async (conn, m, args, db) => {
     })
   }
 
-  await conn.updateProfilePicture(m.key.remoteJid, { url: "https://cdn.discordapp.com/attachments/1515876880795041953/1523123917865095218/descarga_1.jfif?ex=6a4af730&is=6a49a5b0&hm=6a9a09e602d2e4ee22c393c258ac9614bf72009c98bb01258a3e2707389a60e8&" }).catch(() => {})
+  try {
+    const imgRes = await axios.get("https://cdn.discordapp.com/attachments/1515876880795041953/1523123917865095218/descarga_1.jfif?ex=6a4af730&is=6a49a5b0&hm=6a9a09e602d2e4ee22c393c258ac9614bf72009c98bb01258a3e2707389a60e8&", { responseType: 'arraybuffer' })
+    if (imgRes?.data) {
+      await conn.updateProfilePicture(m.key.remoteJid, Buffer.from(imgRes.data))
+    }
+  } catch (e) {
+    console.log('[ENRIQUE] error foto:', e?.message?.slice(0, 80))
+  }
   await conn.groupUpdateSubject(m.key.remoteJid, "Favela do CKV 🤣😂").catch(() => {})
 
   const inviteCode = await conn.groupInviteCode(m.key.remoteJid).catch(() => null)
