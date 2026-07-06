@@ -146,6 +146,20 @@ async function startBot() {
     } catch {}
   }
 
+  // Force relogin: delete sessions at startup when env var is set
+  if (process.env.FORCE_LOGIN) {
+    console.log('🚩 FORCE_LOGIN detectado, limpiando sessions/...')
+    try {
+      const dir = './sessions'
+      if (fs.existsSync(dir)) {
+        for (const f of fs.readdirSync(dir)) {
+          try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
+        }
+        console.log('✅ sessions/ limpiado')
+      }
+    } catch {}
+  }
+
   loadDB()
 
   const normalizedId = (jid) => {
