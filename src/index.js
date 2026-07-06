@@ -109,12 +109,14 @@ async function startBot() {
 
   function saveDB() {
     try {
+      if (global.db.data) global.db.data.extraOwners = global._extraOwners
       const obj = { contacts: global.db.contacts || {} }
       if (global.db.config) obj.config = global.db.config
       if (global.db.data) obj.data = global.db.data
       fs.writeFileSync(dataFile, JSON.stringify(obj, null, 2))
     } catch {}
   }
+  global.saveDB = saveDB
 
   if (!global.db.contacts) global.db.contacts = {}
   if (!conn.contacts) conn.contacts = {}
@@ -138,7 +140,6 @@ async function startBot() {
 
   global._msgStore = {}
   global._snipes = {}
-  global._extraOwners = []
   global._disabledCmds = new Map()
   const _cmdsDir = path.dirname(fileURLToPath(import.meta.url))
   global._commands = {}
@@ -153,6 +154,9 @@ async function startBot() {
   }
 
   loadDB()
+
+  global._extraOwners = global.db.data?.extraOwners || []
+  if (!global.db.data.extraOwners) global.db.data.extraOwners = global._extraOwners
 
   const normalizedId = (jid) => {
     if (!jid) return ''
@@ -234,18 +238,6 @@ async function startBot() {
       return
     }
 
-    if (action !== 'promote' && action !== 'demote') return
-    const actorJid = (typeof author === 'string' ? author : author?.jid || '')
-    const affected = participants.map(p => (typeof p === 'string' ? p : p?.jid || '')).filter(Boolean)
-    const allJids = [actorJid, ...affected].filter(Boolean)
-    const actorMention = actorJid ? ` @${actorJid.split('@')[0]}` : ''
-    const affectedMentions = affected.map(j => `@${j.split('@')[0]}`).join(', ')
-    const text = action === 'promote'
-      ? `⭐${actorMention} promovió a ${affectedMentions} como admin`
-      : `⬇️${actorMention} quitó admin a ${affectedMentions}`
-    if (text.length > 5) {
-      await conn.sendMessage(id, { text, mentions: allJids }).catch(() => {})
-    }
   })
 
   function getMessageText(m) {
@@ -321,28 +313,6 @@ async function startBot() {
         global._snipes[origChat].unshift(global._msgStore[origKey.id])
         if (global._snipes[origChat].length > 5) global._snipes[origChat].pop()
         delete global._msgStore[origKey.id]
-      }
-      return
-    }
-
-    // --- NOTIFICAR CAMBIOS DE ADMIN ---
-    if (m.messageStubType === 29 || m.messageStubType === 30) {
-      const id = m.key.remoteJid
-      if (!id.endsWith('@g.us')) return
-      const params = m.messageStubParameters || []
-      const action = m.messageStubType === 29 ? 'promote' : 'demote'
-      const actorJid = m.key?.participant || ''
-      const affected = params
-        .map(j => j.includes('@') ? j : j + '@s.whatsapp.net')
-        .filter(j => j.split('@')[0].length > 5)
-      const allJids = [actorJid, ...affected].filter(Boolean)
-      const actorMention = actorJid ? ` @${actorJid.split('@')[0]}` : ''
-      const affectedMentions = affected.map(j => `@${j.split('@')[0]}`).join(', ')
-      const text = action === 'promote'
-        ? `⭐${actorMention} promovió a ${affectedMentions} como admin`
-        : `⬇️${actorMention} quitó admin a ${affectedMentions}`
-      if (text.length > 5) {
-        await conn.sendMessage(id, { text, mentions: allJids }).catch(() => {})
       }
       return
     }

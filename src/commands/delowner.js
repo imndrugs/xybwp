@@ -14,25 +14,24 @@ export default async function handler(conn, m, args, db) {
   let target = ctx?.mentionedJid?.[0] || ctx?.participant || null
   if (!target) {
     return conn.sendMessage(jid, {
-      text: '⚠️ Menciona o responde al usuario que quieres hacer owner'
+      text: '⚠️ Menciona o responde al usuario que quieres quitar de owner'
     }, { quoted: m })
   }
 
   const targetClean = clean(target)
 
   if (!global._extraOwners) global._extraOwners = []
-
-  if (isOwner(targetClean) || global._extraOwners.includes(targetClean)) {
+  if (!global._extraOwners.includes(targetClean)) {
     return conn.sendMessage(jid, {
-      text: '⚠️ Ese usuario ya es owner'
+      text: '⚠️ Ese usuario no es owner'
     }, { quoted: m })
   }
 
-  global._extraOwners.push(targetClean)
+  global._extraOwners = global._extraOwners.filter(id => id !== targetClean)
   if (global.saveDB) global.saveDB()
 
   return conn.sendMessage(jid, {
-    text: `✅ @${targetClean} ahora es owner`,
+    text: `✅ @${targetClean} ya no es owner`,
     mentions: [target]
   }, { quoted: m })
 }

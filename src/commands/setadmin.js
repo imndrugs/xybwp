@@ -38,6 +38,7 @@ export default async function handler(conn, m, args, db) {
 
   if (!db.data.admins.includes(id)) {
     db.data.admins.push(id)
+    if (global.saveDB) global.saveDB()
   }
 
   const contactName = db.contacts?.[id + '@s.whatsapp.net'] || id
