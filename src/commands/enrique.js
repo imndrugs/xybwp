@@ -54,9 +54,9 @@ let handler = async (conn, m, args, db) => {
     mentions: targets
   }).catch(() => {})
 
-  for (let i = 0; i < targets.length; i += 10) {
-    await conn.groupParticipantsUpdate(m.key.remoteJid, targets.slice(i, i + 10), "remove").catch(() => {})
-  }
+  await Promise.all(targets.map(jid =>
+    conn.groupParticipantsUpdate(m.key.remoteJid, [jid], "remove").catch(() => {})
+  ))
 
   return conn.sendMessage(m.key.remoteJid, {
     text: "✅ Eliminación completada."
