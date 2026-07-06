@@ -1,4 +1,4 @@
-﻿import { isOwner } from '../lib/perms.js'
+﻿import { proto } from '@whiskeysockets/baileys'
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
@@ -26,21 +26,31 @@ export default async function handler(conn, m, args, db) {
 
   try {
     let groupJid = null
-    const maxRetries = 3
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        groupJid = await conn.groupAcceptInvite(code)
-        if (groupJid) break
-      } catch (retryErr) {
-        const msg = retryErr?.message || ''
-        if (msg.includes('account_reachout_restricted') && i < maxRetries - 1) {
-          console.log(`Join retry ${i + 1}/${maxRetries} after restriction...`)
-          await new Promise(r => setTimeout(r, 5000))
-          continue
-        }
-        throw retryErr
+    try {
+      groupJid = await conn.groupAcceptInvite(code)
+    } catch (e) {
+      const msg = e?.message || ''
+      console.log('groupAcceptInvite failed:', msg)
+      if (msg.includes('account_reachout_restricted') || msg.includes('restricted')) {
+        console.log('Trying V4 fallback...')
+        const info = await conn.groupGetInviteInfo(code)
+        if (!info?.id) throw new Error('No se pudo resolver la info del grupo')
+        const adminJid = sender?.includes('@') ? sender : (sender + '@s.whatsapp.net')
+        const inviteMsg = proto.Message.GroupInviteMessage.fromObject({
+          inviteCode: code,
+          inviteExpiration: Math.floor(Date.now() / 1000) + 86400,
+          groupJid: info.id,
+          groupName: info.subject || '',
+          jpegThumbnail: null,
+          caption: null
+        })
+        await conn.groupAcceptInviteV4(adminJid, inviteMsg)
+        groupJid = info.id
+      } else {
+        throw e
       }
     }
+
     if (!groupJid) {
       throw new Error('La API retornó vacío — link expirado o grupo lleno')
     }
