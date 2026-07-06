@@ -101,13 +101,18 @@ async function startBot() {
       const parsed = JSON.parse(raw)
       if (parsed) {
         if (parsed.contacts) global.db.contacts = parsed.contacts
+        if (parsed.config) global.db.config = parsed.config
+        if (parsed.data) global.db.data = parsed.data
       }
     } catch {}
   }
 
   function saveDB() {
     try {
-      fs.writeFileSync(dataFile, JSON.stringify({ contacts: global.db.contacts || {} }, null, 2))
+      const obj = { contacts: global.db.contacts || {} }
+      if (global.db.config) obj.config = global.db.config
+      if (global.db.data) obj.data = global.db.data
+      fs.writeFileSync(dataFile, JSON.stringify(obj, null, 2))
     } catch {}
   }
 
@@ -119,6 +124,17 @@ async function startBot() {
   if (!global.db.data.antivirgenes) global.db.data.antivirgenes = []
   if (!global.db.data.autoresponder) global.db.data.autoresponder = {}
   if (!global.db.data.afk) global.db.data.afk = {}
+  if (!global.db.config) global.db.config = {}
+  if (!global.db.config.prefix) global.db.config.prefix = '.'
+  if (!global.db.config.botName) global.db.config.botName = 'CKV BOT'
+  if (!global.db.config.menuStyle) global.db.config.menuStyle = 'default'
+  if (!global.db.config.stickerPack) global.db.config.stickerPack = 'CKV'
+  if (!global.db.config.stickerAuthor) global.db.config.stickerAuthor = 'Bot'
+  if (!global.db.config.mode) global.db.config.mode = 'public'
+  if (!global.db.config.welcome) global.db.config.welcome = {}
+  if (!global.db.config.goodbye) global.db.config.goodbye = {}
+  if (!global.db.config.antilink) global.db.config.antilink = []
+  if (!global.db.config.antispam) global.db.config.antispam = []
 
   global._msgStore = {}
   global._snipes = {}
@@ -189,6 +205,35 @@ async function startBot() {
   // --- NOTIFICAR CAMBIOS DE ADMIN (via event) ---
   conn.ev.on('group-participants.update', async ({ id, participants, action, author }) => {
     if (!id?.endsWith?.('@g.us')) return
+
+    if (action === 'add') {
+      const welcomeText = global.db.config?.welcome?.[id]
+      if (welcomeText) {
+        for (const p of participants) {
+          const jid = typeof p === 'string' ? p : p?.jid || ''
+          if (jid) {
+            const text = welcomeText.replace(/@user/g, `@${jid.split('@')[0]}`)
+            await conn.sendMessage(id, { text, mentions: [jid] }).catch(() => {})
+          }
+        }
+      }
+      return
+    }
+
+    if (action === 'remove') {
+      const goodbyeText = global.db.config?.goodbye?.[id]
+      if (goodbyeText) {
+        for (const p of participants) {
+          const jid = typeof p === 'string' ? p : p?.jid || ''
+          if (jid) {
+            const text = goodbyeText.replace(/@user/g, `@${jid.split('@')[0]}`)
+            await conn.sendMessage(id, { text, mentions: [jid] }).catch(() => {})
+          }
+        }
+      }
+      return
+    }
+
     if (action !== 'promote' && action !== 'demote') return
     const actorJid = (typeof author === 'string' ? author : author?.jid || '')
     const affected = participants.map(p => (typeof p === 'string' ? p : p?.jid || '')).filter(Boolean)
@@ -385,6 +430,30 @@ async function startBot() {
     // --- BANNED CHECK: ignorar silenciosamente a usuarios baneados ---
     if (isBanned(sender, global.db) && sender !== botJid) {
       return
+    }
+
+    // --- ANTILINK ---
+    if (isGroup && (global.db.config?.antilink || []).includes(chat) && sender !== botJid) {
+      const txt = m.text || ''
+      if (/https?:\/\/(?!chat\.whatsapp\.com)[^\s]+/i.test(txt)) {
+        try {
+          await conn.sendMessage(chat, { delete: { remoteJid: chat, fromMe: false, id: m.key.id, participant: m.key.participant } })
+        } catch {}
+      }
+    }
+
+    // --- ANTISPAM (5 msgs en 5s = warn) ---
+    if (isGroup && (global.db.config?.antispam || []).includes(chat) && sender !== botJid) {
+      if (!global._spamCount) global._spamCount = {}
+      if (!global._spamCount[sender]) global._spamCount[sender] = []
+      const now = Date.now()
+      global._spamCount[sender] = global._spamCount[sender].filter(t => now - t < 5000)
+      global._spamCount[sender].push(now)
+      if (global._spamCount[sender].length > 5) {
+        try {
+          await conn.sendMessage(chat, { delete: { remoteJid: chat, fromMe: false, id: m.key.id, participant: m.key.participant } })
+        } catch {}
+      }
     }
 
     // --- AFK AUTO-REMOVE: si el usuario AFK escribe algo, salir de AFK ---
