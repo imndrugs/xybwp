@@ -40,6 +40,8 @@ async function startBot() {
     }
   } catch {}
 
+  global._startTime = Date.now()
+
   global.db = {
   data: {
     admins: [],

@@ -10,7 +10,7 @@ const categories = {
     'setadmin', 'deladmin', 'makeowner',
     'cmdoff', 'cmdon', 'testowner',
     'bc', 'setname', 'setwm', 'mode', 'setpfp',
-    'makeowner', 'delowner', 'savedata'
+    'makeowner', 'delowner', 'savedata', 'restart'
   ],
   '⚙️ ADMINISTRACIÓN': [
     'admin', 'promote', 'demote',
@@ -64,6 +64,7 @@ const descriptions = {
   setpfp: 'Cambiar foto de perfil del bot',
   delowner: 'Quitar owner',
   savedata: 'Guardar datos en base de datos',
+  restart: 'Reiniciar el bot (owner)',
   mute: 'Silenciar usuario', unmute: 'Quitar silencio',
   welcome: 'Configurar mensaje de bienvenida',
   goodbye: 'Configurar mensaje de despedida',

@@ -9,7 +9,7 @@ export default async function handler(conn, m, args, db) {
     return conn.sendMessage(chat, { text: '⚠️ *Uso:* .ytmp3 <link de YouTube>\n\n📌 *Ejemplos:*\n• .ytmp3 https://youtu.be/xxx\n• .ytmp3 https://youtube.com/watch?v=xxx' }, { quoted: m })
   }
 
-  await conn.sendMessage(chat, { text: '⏳ Descargando audio...' }, { quoted: m })
+  await conn.sendMessage(chat, { react: { text: '⏳', key: m.key } })
 
   const tmp = path.join(process.cwd(), 'temp')
   if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true })
@@ -21,12 +21,14 @@ export default async function handler(conn, m, args, db) {
       { timeout: 120000, stdio: 'pipe' }
     )
     if (fs.existsSync(out) && fs.statSync(out).size > 5000) {
+      await conn.sendMessage(chat, { react: { text: '✅', key: m.key } })
       await conn.sendMessage(chat, { audio: { url: out }, mimetype: 'audio/mpeg', ptt: false }, { quoted: m })
       fs.unlinkSync(out)
     } else {
       throw new Error('Audio muy pequeño o vacío')
     }
   } catch (e) {
+    await conn.sendMessage(chat, { react: { text: '❌', key: m.key } }).catch(() => {})
     const msg = (e.stderr?.toString() || e.stdout?.toString() || e.message || '')
     if (msg.includes('Sign in') || msg.includes('login')) {
       conn.sendMessage(chat, { text: '❌ YouTube bloqueó la descarga.\n\n💡 Usa .ytcookies para subir cookies de YouTube:\n1. Chrome > extensión Get cookies.txt LOCALLY\n2. Ve a youtube.com, inicia sesión\n3. Exporta cookies\n4. Envía el .txt al chat y responde .ytcookies' }, { quoted: m })

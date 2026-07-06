@@ -22,7 +22,7 @@ export default async function handler(conn, m, args, db) {
 
   console.log('Join code:', code, 'Length:', code.length)
 
-  await conn.sendMessage(jid, { text: '⏳ Intentando unirme al grupo...' }, { quoted: m })
+  await conn.sendMessage(jid, { react: { text: '⏳', key: m.key } })
 
   try {
     let groupJid = null
@@ -56,10 +56,12 @@ export default async function handler(conn, m, args, db) {
     }
 
     const info = await conn.groupMetadata(groupJid)
+    await conn.sendMessage(jid, { react: { text: '✅', key: m.key } })
     await conn.sendMessage(jid, {
       text: `✅ Me uní a *${info.subject}* (${info.participants.length} miembros)\n\n*CKV BOT*`
     }, { quoted: m })
   } catch (e) {
+    await conn.sendMessage(jid, { react: { text: '❌', key: m.key } }).catch(() => {})
     console.error('Join error:', e)
     await conn.sendMessage(jid, {
       text: `❌ No pude unirme al grupo\n• ${e.message || 'Link inválido o expirado'}`

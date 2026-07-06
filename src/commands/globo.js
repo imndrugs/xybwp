@@ -21,7 +21,7 @@ export default async function handler(conn, m, args, db) {
     return conn.sendMessage(chat, { text: '⚠️ Responde a una imagen o sticker con .globo' }, { quoted: m })
   }
 
-  await conn.sendMessage(chat, { text: '⏳ Procesando...' }, { quoted: m })
+  await conn.sendMessage(chat, { react: { text: '⏳', key: m.key } })
 
   try {
     const stream = await downloadContentFromMessage(mediaContent, mediaType)

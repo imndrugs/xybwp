@@ -9,7 +9,7 @@ export default async function handler(conn, m, args, db) {
     return conn.sendMessage(chat, { text: '⚠️ *Uso:* .mediafire <link de MediaFire>\n\n📌 *Ejemplo:*\n• .mediafire https://www.mediafire.com/file/xxx/nombre.zip/file' }, { quoted: m })
   }
 
-  await conn.sendMessage(chat, { text: '⏳ Obteniendo enlace...' }, { quoted: m })
+  await conn.sendMessage(chat, { react: { text: '⏳', key: m.key } })
 
   try {
     const { data } = await axios.get(url, {
@@ -73,8 +73,10 @@ export default async function handler(conn, m, args, db) {
     } catch {}
     try { fs.unlinkSync(outPath) } catch {}
 
+    await conn.sendMessage(chat, { react: { text: '✅', key: m.key } })
     conn.sendMessage(chat, { text: `📁 *${name}*\n🔗 ${dlUrl}\n\n*CKV BOT*` }, { quoted: m })
   } catch (e) {
+    await conn.sendMessage(chat, { react: { text: '❌', key: m.key } }).catch(() => {})
     conn.sendMessage(chat, { text: `❌ No pude obtener el enlace\n• ${e.message?.slice(0, 100)}` }, { quoted: m })
   }
 }

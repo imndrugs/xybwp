@@ -8,7 +8,7 @@ export default async function handler(conn, m, args, db) {
   const text = args.join(' ')
   if (!text) return conn.sendMessage(chat, { text: '⚠️ *Uso:* .bc <mensaje>\n\n📌 Envía un mensaje a todos los grupos donde está el bot' }, { quoted: m })
 
-  await conn.sendMessage(chat, { text: '⏳ Enviando broadcast...' }, { quoted: m })
+  await conn.sendMessage(chat, { react: { text: '⏳', key: m.key } })
 
   let sent = 0
   let failed = 0
@@ -28,5 +28,6 @@ export default async function handler(conn, m, args, db) {
     return conn.sendMessage(chat, { text: `❌ Error al obtener grupos: ${e.message?.slice(0, 100)}` }, { quoted: m })
   }
 
+  await conn.sendMessage(chat, { react: { text: '✅', key: m.key } })
   conn.sendMessage(chat, { text: `✅ Broadcast enviado a ${sent} grupos${failed ? `, ${failed} fallaron` : ''}\n\n*CKV BOT*` }, { quoted: m })
 }
