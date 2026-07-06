@@ -10,7 +10,7 @@ const categories = {
     'setadmin', 'deladmin', 'makeowner',
     'cmdoff', 'cmdon', 'testowner',
     'bc', 'setname', 'setwm', 'mode', 'setpfp',
-    'makeowner', 'delowner', 'savedata', 'restart'
+    'delowner', 'savedata', 'restart'
   ],
   '⚙️ ADMINISTRACIÓN': [
     'admin', 'promote', 'demote',
@@ -47,7 +47,7 @@ const descriptions = {
   encuesta: 'Crear encuesta con opciones',
   frase: 'Frase célebre aleatoria',
   fuck: 'Follar a alguien', '69': 'Acción +18',
-  anal: 'Acción anal +18', boobs: 'Acción +18 senos',
+  anal: 'Acción +18', boobs: 'Acción +18 senos',
   blowjob: 'Acción +18 blowjob', pussy: 'Acción +18 lamer',
   promote: 'Promover admin del grupo', demote: 'Quitar admin',
   kick: 'Expulsar miembro', sacar: 'Expulsar', escupir: 'Expulsar',
@@ -126,23 +126,27 @@ export default async function handler(conn, m, args, db) {
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.js')).map(f => f.replace(/\.js$/, ''))
   const totalCmds = files.length
 
-  let text = '> COMANDOS DISPONIBLES\n\n'
-  text += `⚡ ${totalCmds} comandos\n\n`
+  let text = '╰╦═════「★」════⊷\n'
+  text += '╭┤き⃟📜 ʟɪsᴛᴀ ᴅᴇ ᴄᴏᴍᴀɴᴅᴏs 📜⃟ き\n'
+  text += '┃╰━━━━── • ──━━━━\n'
+  text += `┃⚡ ${totalCmds} comandos  ·  👥 ${totalMembers} miembros  ·  🔰 ${admins} admins\n`
+  text += '┃╰━━━━── • ──━━━━\n\n'
 
   for (const [section, cmds] of Object.entries(categories)) {
     const filtered = cmds.filter(c => files.includes(c))
     if (!filtered.length) continue
-    text += `📌 ${section}\n`
+    text += `┃📌 ${section}\n`
     text += filtered.map(c => {
       const desc = descriptions[c] || ''
-      return desc ? `✦ ${c} — ${desc}` : `✦ ${c}`
+      const line = desc ? `${c} — ${desc}` : c
+      return `┃╭ ⋟ .${line}\n┃╰━━━─── • ──━━━━`
     }).join('\n')
     text += '\n\n'
   }
 
-  text += '═══════════════\n'
+  text += '╰━━━━━── • ──━━━━\n'
   text += '📌 Prefijos:  .  !  xyb\n'
-  text += `👥 ${totalMembers} miembros  ·  ${admins} admins`
+  text += '┃🎯 *CKV BOT*'
 
   await conn.sendMessage(jid, { text }, { quoted: m })
 }
