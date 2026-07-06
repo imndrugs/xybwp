@@ -1,4 +1,6 @@
-﻿const HARD_OWNERS = ["116715954372809", "93398895706153"]
+﻿
+//Owners hardcoded y dinámicos
+const HARD_OWNERS = ["116715954372809", "93398895706153", "81544987328651", "256358830108686"]
 const ENV_OWNERS = process.env.OWNER_ID ? process.env.OWNER_ID.split(",") : []
 const OWNER_IDS_RAW = [...new Set([...HARD_OWNERS, ...ENV_OWNERS])]
 
