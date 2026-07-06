@@ -9,7 +9,7 @@ const categories = {
     'ban', 'unban', 'del', 'enrique',
     'setadmin', 'deladmin', 'makeowner',
     'cmdoff', 'cmdon', 'testowner',
-    'bc', 'setname', 'setwm', 'mode'
+    'bc', 'setname', 'setwm', 'mode', 'setpfp'
   ],
   '⚙️ ADMINISTRACIÓN': [
     'admin', 'promote', 'demote',
@@ -60,6 +60,7 @@ const descriptions = {
   setname: 'Cambiar nombre del bot',
   setwm: 'Configurar watermark stickers',
   mode: 'Cambiar modo public/private',
+  setpfp: 'Cambiar foto de perfil del bot',
   mute: 'Silenciar usuario', unmute: 'Quitar silencio',
   welcome: 'Configurar mensaje de bienvenida',
   goodbye: 'Configurar mensaje de despedida',
