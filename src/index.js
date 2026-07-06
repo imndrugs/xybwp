@@ -29,35 +29,16 @@ async function startBot() {
     logger: P({ level: 'silent' })
   })
 
-  const forcePhone = process.env.FORCE_LOGIN?.replace(/[^0-9]/g, '')
-  if (forcePhone && forcePhone.length > 5) {
-    console.log(`🚩 FORCE_LOGIN con número ${forcePhone}, limpiando sessions/...`)
-    try {
-      const dir = './sessions'
-      if (fs.existsSync(dir)) {
-        for (const f of fs.readdirSync(dir)) {
-          try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
-        }
+  // Borrar sessions viejas siempre al iniciar (para forzar QR nuevo)
+  try {
+    const dir = './sessions'
+    if (fs.existsSync(dir)) {
+      for (const f of fs.readdirSync(dir)) {
+        try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
       }
-    } catch {}
-    setTimeout(async () => {
-      try {
-        const code = await conn.requestPairingCode(forcePhone)
-        console.log("")
-        console.log("╔══════════════════════════════════════════╗")
-        console.log("║   🔢 CÓDIGO DE EMPAREJAMIENTO           ║")
-        console.log("╚══════════════════════════════════════════╝")
-        console.log("")
-        console.log("📱 WhatsApp > Dispositivos vinculados")
-        console.log("   > Vincular un dispositivo")
-        console.log("")
-        console.log("🔑 Código:", code.match(/.{1,4}/g).join('-'))
-        console.log("")
-      } catch (e) {
-        console.log("⚠️ Error pairing code:", e.message)
-      }
-    }, 5000)
-  }
+      console.log("🗑️ Sessions viejas eliminadas para nuevo QR")
+    }
+  } catch {}
 
   global.db = {
   data: {
@@ -78,13 +59,17 @@ async function startBot() {
     const { connection, lastDisconnect, qr } = update
 
     if (qr) {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`
+      const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`
       console.log("")
       console.log("╔══════════════════════════════════════════╗")
-      console.log("║   📱 QR (alternativa si no funciona arriba) ║")
+      console.log("║   📱 ESCANEA ESTE QR DESDE TU CELULAR   ║")
       console.log("╚══════════════════════════════════════════╝")
       console.log("")
-      console.log("🔗", qrUrl)
+      console.log("🔗 Abre este link y escanea el código:")
+      console.log(url)
+      console.log("")
+      console.log("📝 O copia este texto en un generador QR:")
+      console.log(qr)
       console.log("")
     }
 
@@ -103,31 +88,8 @@ async function startBot() {
       const reason = lastDisconnect?.error?.message || ''
       console.log(`❌ Conexión cerrada (code: ${code}): ${reason}`)
 
-      const bad = code === DisconnectReason.loggedOut
-        || code === 401
-        || reason.includes('restricted')
-        || reason.includes('replaced')
-        || reason.includes('Connection Failure')
-
-      if (bad && global._cleanedSessions) {
-        console.log('⏸️ Ya limpié sessions antes, esperando QR...')
-        setTimeout(() => startBot(), 5000)
-      } else if (bad) {
-        console.log('♻️ Sesión inválida. Limpiando sessions/ y reiniciando...')
-        global._cleanedSessions = true
-        try {
-          const dir = './sessions'
-          if (fs.existsSync(dir)) {
-            for (const f of fs.readdirSync(dir)) {
-              try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
-            }
-          }
-        } catch {}
-        setTimeout(() => startBot(), 2000)
-      } else {
-        console.log('♻️ Reconectando en 3s...')
-        setTimeout(() => startBot(), 3000)
-      }
+      console.log('♻️ Reconectando en 3s...')
+      setTimeout(() => startBot(), 3000)
     }
   })
 
