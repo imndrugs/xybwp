@@ -20,7 +20,7 @@ export default async function handler(conn, m, args, db) {
 
   try {
     execSync(
-      `yt-dlp ${cookiesArg} --js-runtimes deno --compat-options no-attempt-n --extractor-retries 5 --geo-bypass -x --audio-format mp3 --audio-quality 0 -o "${out}" "${url}"`,
+      `yt-dlp ${cookiesArg} --extractor-retries 5 --geo-bypass -x --audio-format mp3 --audio-quality 0 -o "${out}" "${url}"`,
       { timeout: 120000, stdio: 'pipe' }
     )
     if (fs.existsSync(out) && fs.statSync(out).size > 5000) {

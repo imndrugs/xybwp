@@ -3,7 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const categories = {
-  '🎮 Interactivos': ['hi', 'hola', 'bye', 'adios', 'love', 'dado', 'ppt', 'encuesta', 'top', 'frase'],
+  '🎮 Interactivos': ['hi', 'hola', 'bye', 'adios', 'love', 'dado', 'ppt', 'encuesta', 'frase'],
   '🔥 NSFW': ['fuck', '69', 'anal', 'boobs', 'blowjob', 'pussy'],
   '🔐 STAFF': [
     'ban', 'unban', 'del', 'enrique',
@@ -14,7 +14,7 @@ const categories = {
   '⚙️ ADMINISTRACIÓN': [
     'admin', 'promote', 'demote',
     'kick', 'sacar', 'escupir',
-    'mute', 'unmute', 'add',
+    'mute', 'unmute',
     'welcome', 'goodbye', 'antilink', 'antispam',
     'group', 'invite', 'linkrevoke', 'setdesc',
     'link', 'autoadmin', 'antivirgenes'
@@ -44,7 +44,6 @@ const descriptions = {
   dado: 'Lanzar un dado 🎲',
   ppt: 'Piedra, papel o tijera',
   encuesta: 'Crear encuesta con opciones',
-  top: 'Top 10 de algo con miembros del grupo',
   frase: 'Frase célebre aleatoria',
   fuck: 'Follar a alguien', '69': 'Acción +18',
   anal: 'Acción anal +18', boobs: 'Acción +18 senos',
@@ -62,7 +61,6 @@ const descriptions = {
   setwm: 'Configurar watermark stickers',
   mode: 'Cambiar modo public/private',
   mute: 'Silenciar usuario', unmute: 'Quitar silencio',
-  add: 'Agregar miembro al grupo',
   welcome: 'Configurar mensaje de bienvenida',
   goodbye: 'Configurar mensaje de despedida',
   antilink: 'Activar/desactivar anti-enlaces',

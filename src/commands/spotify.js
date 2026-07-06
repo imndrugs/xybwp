@@ -29,7 +29,7 @@ export default async function handler(conn, m, args, db) {
     const cookiesArg = fs.existsSync(cookiesFile) ? `--cookies "${cookiesFile}"` : ''
 
     execSync(
-      `yt-dlp ${cookiesArg} --js-runtimes deno --compat-options no-attempt-n --extractor-retries 5 --default-search ytsearch -x --audio-format mp3 --audio-quality 0 -o "${out}" "${track}"`,
+      `yt-dlp ${cookiesArg} --extractor-retries 5 --default-search ytsearch -x --audio-format mp3 --audio-quality 0 -o "${out}" "${track}"`,
       { timeout: 120000, stdio: 'pipe' }
     )
 

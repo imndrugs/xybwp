@@ -8,25 +8,34 @@ const globeFile = path.join(process.cwd(), 'assets', 'globo.png')
 export default async function handler(conn, m, args, db) {
   const chat = m.chat || m.key?.remoteJid
 
-  const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage
-  const mediaMessage = quotedMsg?.imageMessage
-    ? { message: { imageMessage: quotedMsg.imageMessage }, key: { id: m.key?.id } }
-    : null
+  const contextInfo = m.message?.extendedTextMessage?.contextInfo
+  const quotedMsg = contextInfo?.quotedMessage
+  const mediaContent = quotedMsg?.imageMessage || quotedMsg?.stickerMessage
+  const mediaType = quotedMsg?.imageMessage ? 'imageMessage' : quotedMsg?.stickerMessage ? 'stickerMessage' : null
 
-  if (!mediaMessage) {
-    return conn.sendMessage(chat, { text: '⚠️ Responde a una imagen con .globo' }, { quoted: m })
+  if (!mediaContent || !mediaType) {
+    return conn.sendMessage(chat, { text: '⚠️ Responde a una imagen o sticker con .globo' }, { quoted: m })
   }
 
   await conn.sendMessage(chat, { text: '⏳ Procesando...' }, { quoted: m })
 
   try {
+    const mediaMessage = {
+      message: { [mediaType]: mediaContent },
+      key: {
+        remoteJid: m.key.remoteJid,
+        fromMe: false,
+        id: contextInfo.stanzaId,
+        participant: contextInfo.participant
+      }
+    }
+
     const userBuffer = await downloadMediaMessage(mediaMessage, 'buffer', {})
     const globeBuffer = fs.readFileSync(globeFile)
 
     const gMeta = await sharp(globeBuffer).metadata()
     const gw = gMeta.width, gh = gMeta.height
 
-    // Make outline-only version of globe (dark pixels opaque, light interior transparent)
     const raw = await sharp(globeBuffer).raw().toBuffer()
     const alpha = Buffer.alloc(gw * gh)
     for (let i = 0; i < gw * gh; i++) {
@@ -38,9 +47,9 @@ export default async function handler(conn, m, args, db) {
       .png()
       .toBuffer()
 
-    // Composite user image with globe outline on top
-    const outPath = path.join(process.cwd(), 'temp', `globo_${Date.now()}.webp`)
-    if (!fs.existsSync(path.join(process.cwd(), 'temp'))) fs.mkdirSync(path.join(process.cwd(), 'temp'), { recursive: true })
+    const tmp = path.join(process.cwd(), 'temp')
+    if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true })
+    const outPath = path.join(tmp, `globo_${Date.now()}.webp`)
 
     await sharp(userBuffer)
       .resize(gw, gh, { fit: 'cover' })
@@ -51,6 +60,6 @@ export default async function handler(conn, m, args, db) {
     await conn.sendMessage(chat, { sticker: { url: outPath } }, { quoted: m })
     try { fs.unlinkSync(outPath) } catch {}
   } catch (e) {
-    conn.sendMessage(chat, { text: `❌ Error: ${e.message?.slice(0, 100)}` }, { quoted: m })
+    conn.sendMessage(chat, { text: `❌ Error: ${e.message?.slice(0, 150)}` }, { quoted: m })
   }
 }
