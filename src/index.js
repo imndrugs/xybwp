@@ -26,9 +26,38 @@ async function startBot() {
   const conn = makeWASocket({
     version,
     auth: state,
-    printQRInTerminal: true,
     logger: P({ level: 'silent' })
   })
+
+  const forcePhone = process.env.FORCE_LOGIN?.replace(/[^0-9]/g, '')
+  if (forcePhone && forcePhone.length > 5) {
+    console.log(`🚩 FORCE_LOGIN con número ${forcePhone}, limpiando sessions/...`)
+    try {
+      const dir = './sessions'
+      if (fs.existsSync(dir)) {
+        for (const f of fs.readdirSync(dir)) {
+          try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
+        }
+      }
+    } catch {}
+    setTimeout(async () => {
+      try {
+        const code = await conn.requestPairingCode(forcePhone)
+        console.log("")
+        console.log("╔══════════════════════════════════════════╗")
+        console.log("║   🔢 CÓDIGO DE EMPAREJAMIENTO           ║")
+        console.log("╚══════════════════════════════════════════╝")
+        console.log("")
+        console.log("📱 WhatsApp > Dispositivos vinculados")
+        console.log("   > Vincular un dispositivo")
+        console.log("")
+        console.log("🔑 Código:", code.match(/.{1,4}/g).join('-'))
+        console.log("")
+      } catch (e) {
+        console.log("⚠️ Error pairing code:", e.message)
+      }
+    }, 5000)
+  }
 
   global.db = {
   data: {
@@ -52,11 +81,10 @@ async function startBot() {
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`
       console.log("")
       console.log("╔══════════════════════════════════════════╗")
-      console.log("║   📱 ESCANEA EL QR PARA LOGUEAR         ║")
+      console.log("║   📱 QR (alternativa si no funciona arriba) ║")
       console.log("╚══════════════════════════════════════════╝")
       console.log("")
-      console.log("🔗 Abre este link en tu celular y escanea:")
-      console.log(qrUrl)
+      console.log("🔗", qrUrl)
       console.log("")
     }
 
@@ -143,20 +171,6 @@ async function startBot() {
     try {
       const mod = await import(`./commands/${f}`)
       if (mod?.default) global._commands[name] = mod.default
-    } catch {}
-  }
-
-  // Force relogin: delete sessions at startup when env var is set
-  if (process.env.FORCE_LOGIN) {
-    console.log('🚩 FORCE_LOGIN detectado, limpiando sessions/...')
-    try {
-      const dir = './sessions'
-      if (fs.existsSync(dir)) {
-        for (const f of fs.readdirSync(dir)) {
-          try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
-        }
-        console.log('✅ sessions/ limpiado')
-      }
     } catch {}
   }
 
