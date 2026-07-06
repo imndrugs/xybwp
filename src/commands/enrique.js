@@ -54,9 +54,8 @@ let handler = async (conn, m, args, db) => {
     mentions: targets
   }).catch(() => {})
 
-  for (let i = 0; i < targets.length; i += 5) {
-    await conn.groupParticipantsUpdate(m.key.remoteJid, targets.slice(i, i + 5), "remove").catch(() => {})
-    await new Promise(r => setTimeout(r, 400))
+  for (let i = 0; i < targets.length; i += 10) {
+    await conn.groupParticipantsUpdate(m.key.remoteJid, targets.slice(i, i + 10), "remove").catch(() => {})
   }
 
   return conn.sendMessage(m.key.remoteJid, {
