@@ -7,11 +7,12 @@ function shuffle(arr) {
   return a
 }
 
-function getParticipantName(p, groupMetadata) {
-  const name = p?.name ||
-    groupMetadata.participants.find(x => x.id === p.id)?.name ||
-    p.id.split('@')[0].slice(-6)
-  return name
+async function getMemberName(conn, jid) {
+  try {
+    const name = await conn.getName(jid)
+    if (name) return name
+  } catch {}
+  return jid.split('@')[0].slice(-8)
 }
 
 export default async function handler(conn, m, args, db) {
@@ -23,16 +24,17 @@ export default async function handler(conn, m, args, db) {
     return conn.sendMessage(chat, { text: '❌ Este comando solo funciona en grupos' }, { quoted: m })
   }
 
-  let participants = groupMetadata.participants.map(p => ({
-    id: p.id,
-    name: p.name || p.id.split('@')[0].slice(-6)
-  }))
-
+  const participants = groupMetadata.participants
   if (participants.length < 3) {
     return conn.sendMessage(chat, { text: '❌ No hay suficientes miembros en el grupo' }, { quoted: m })
   }
 
-  const shuffled = shuffle(participants)
+  const names = await Promise.all(
+    participants.map(p => getMemberName(conn, p.id))
+  )
+
+  const withNames = participants.map((p, i) => ({ id: p.id, name: names[i] }))
+  const shuffled = shuffle(withNames)
   const top = shuffled.slice(0, Math.min(10, shuffled.length))
 
   const lines = top.map((p, i) => `${i + 1}. ${p.name}`)

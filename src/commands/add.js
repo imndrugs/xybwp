@@ -41,8 +41,16 @@ export default async function handler(conn, m, args, db) {
       conn.sendMessage(chat, { text: '⚠️ Ese número ya está en el grupo' }, { quoted: m })
     } else if (msg.includes('not_authorized') || msg.includes('forbidden') || msg.includes('403')) {
       conn.sendMessage(chat, { text: '❌ El bot necesita ser admin del grupo para agregar miembros' }, { quoted: m })
-    } else if (msg.includes('account_reachout_restricted') || msg.includes('rate')) {
-      conn.sendMessage(chat, { text: '❌ WhatsApp restringió esta acción temporalmente. Espera unos minutos' }, { quoted: m })
+    } else if (msg.includes('account_reachout_restricted') || msg.includes('rate') || msg.includes('restricted')) {
+      try {
+        const code = await conn.groupInviteCode(chat)
+        const invite = `https://chat.whatsapp.com/${code}`
+        conn.sendMessage(chat, {
+          text: `❌ WhatsApp no permite que el bot agregue miembros directamente.\n\n📌 Envía este link a la persona:\n${invite}\n\n*CKV BOT*`
+        }, { quoted: m })
+      } catch {
+        conn.sendMessage(chat, { text: '❌ WhatsApp restringió agregar miembros. Comparte el link del grupo manualmente.' }, { quoted: m })
+      }
     } else {
       conn.sendMessage(chat, { text: `❌ No pude agregarlo\n• ${msg.slice(0, 100)}` }, { quoted: m })
     }

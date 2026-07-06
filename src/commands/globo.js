@@ -1,24 +1,9 @@
-import axios from 'axios'
 import sharp from 'sharp'
 import { downloadMediaMessage } from '@whiskeysockets/baileys'
 import fs from 'fs'
 import path from 'path'
 
-const GLOBE_URL = 'https://cdn.discordapp.com/attachments/1517453653890437140/1523494786450067569/globo.png'
-const tmpDir = path.join(process.cwd(), 'temp')
-const globeCache = path.join(tmpDir, 'globo_overlay.png')
-
-async function getGlobeOverlay() {
-  if (fs.existsSync(globeCache)) return globeCache
-  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
-  const res = await axios.get(GLOBE_URL, {
-    responseType: 'arraybuffer',
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-    timeout: 15000
-  })
-  fs.writeFileSync(globeCache, res.data)
-  return globeCache
-}
+const globeFile = path.join(process.cwd(), 'assets', 'globo.png')
 
 export default async function handler(conn, m, args, db) {
   const chat = m.chat || m.key?.remoteJid
@@ -36,32 +21,35 @@ export default async function handler(conn, m, args, db) {
 
   try {
     const userBuffer = await downloadMediaMessage(mediaMessage, 'buffer', {})
-    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
+    const globeBuffer = fs.readFileSync(globeFile)
 
-    const globePath = await getGlobeOverlay()
-    const globeMeta = await sharp(globePath).metadata()
-    const gw = globeMeta.width
-    const gh = globeMeta.height
+    const gMeta = await sharp(globeBuffer).metadata()
+    const gw = gMeta.width, gh = gMeta.height
 
-    const userResized = await sharp(userBuffer)
-      .resize(gw, gh, { fit: 'cover', position: 'centre' })
+    // Make outline-only version of globe (dark pixels opaque, light interior transparent)
+    const raw = await sharp(globeBuffer).raw().toBuffer()
+    const alpha = Buffer.alloc(gw * gh)
+    for (let i = 0; i < gw * gh; i++) {
+      const r = raw[i * 3], g = raw[i * 3 + 1], b = raw[i * 3 + 2]
+      alpha[i] = (r < 150 && g < 150 && b < 150) ? 255 : 0
+    }
+    const globeOutline = await sharp(raw, { raw: { width: gw, height: gh, channels: 3 } })
+      .joinChannel(alpha)
       .png()
       .toBuffer()
 
-    const outputPath = path.join(tmpDir, `globo_out_${Date.now()}.webp`)
+    // Composite user image with globe outline on top
+    const outPath = path.join(process.cwd(), 'temp', `globo_${Date.now()}.webp`)
+    if (!fs.existsSync(path.join(process.cwd(), 'temp'))) fs.mkdirSync(path.join(process.cwd(), 'temp'), { recursive: true })
 
-    await sharp({
-      create: { width: gw, height: gh, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
-    })
-      .composite([
-        { input: userResized, top: 0, left: 0 },
-        { input: globePath, top: 0, left: 0 },
-      ])
+    await sharp(userBuffer)
+      .resize(gw, gh, { fit: 'cover' })
+      .composite([{ input: globeOutline, top: 0, left: 0 }])
       .webp({ quality: 90 })
-      .toFile(outputPath)
+      .toFile(outPath)
 
-    await conn.sendMessage(chat, { sticker: { url: outputPath } }, { quoted: m })
-    try { fs.unlinkSync(outputPath) } catch {}
+    await conn.sendMessage(chat, { sticker: { url: outPath } }, { quoted: m })
+    try { fs.unlinkSync(outPath) } catch {}
   } catch (e) {
     conn.sendMessage(chat, { text: `❌ Error: ${e.message?.slice(0, 100)}` }, { quoted: m })
   }

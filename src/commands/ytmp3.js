@@ -20,7 +20,7 @@ export default async function handler(conn, m, args, db) {
 
   try {
     execSync(
-      `yt-dlp ${cookiesArg} --js-runtimes deno -x --audio-format mp3 --audio-quality 0 -o "${out}" "${url}"`,
+      `yt-dlp ${cookiesArg} --js-runtimes deno --compat-options no-attempt-n --extractor-retries 5 --geo-bypass -x --audio-format mp3 --audio-quality 0 -o "${out}" "${url}"`,
       { timeout: 120000, stdio: 'pipe' }
     )
     if (fs.existsSync(out) && fs.statSync(out).size > 5000) {
@@ -30,11 +30,12 @@ export default async function handler(conn, m, args, db) {
       throw new Error('Audio muy pequeño o vacío')
     }
   } catch (e) {
-    const msg = e.stderr?.toString() || e.message || ''
-    if (msg.includes('Sign in')) {
-      conn.sendMessage(chat, { text: '❌ YouTube bloqueó la descarga.\n\n💡 Usa .ytcookies para subir un archivo cookies.txt de YouTube (inicia sesión en Chrome, exporta cookies con extensión, envía el archivo y responde .ytcookies)' }, { quoted: m })
+    const msg = (e.stderr?.toString() || e.stdout?.toString() || e.message || '')
+    if (msg.includes('Sign in') || msg.includes('login')) {
+      conn.sendMessage(chat, { text: '❌ YouTube bloqueó la descarga.\n\n💡 Usa .ytcookies para subir cookies de YouTube:\n1. Chrome > extensión Get cookies.txt LOCALLY\n2. Ve a youtube.com, inicia sesión\n3. Exporta cookies\n4. Envía el .txt al chat y responde .ytcookies' }, { quoted: m })
     } else {
-      conn.sendMessage(chat, { text: `❌ Error: ${msg.slice(0, 200)}` }, { quoted: m })
+      const short = msg.replace(/^(WARNING|ERROR).*?(error|Error)/s, '').slice(0, 300).trim() || 'desconocido'
+      conn.sendMessage(chat, { text: `❌ Error al descargar\n${short.slice(0, 200)}` }, { quoted: m })
     }
     try { fs.unlinkSync(out) } catch {}
   }
