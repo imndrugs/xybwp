@@ -1,5 +1,5 @@
 import sharp from 'sharp'
-import { downloadMediaMessage } from '@whiskeysockets/baileys'
+import { downloadContentFromMessage } from '@whiskeysockets/baileys'
 import fs from 'fs'
 import path from 'path'
 
@@ -8,31 +8,24 @@ const globeFile = path.join(process.cwd(), 'assets', 'globo.png')
 export default async function handler(conn, m, args, db) {
   const chat = m.chat || m.key?.remoteJid
 
-  const contextInfo = m.message?.extendedTextMessage?.contextInfo
-  const quotedMsg = contextInfo?.quotedMessage
-  const mediaContent = quotedMsg?.imageMessage || quotedMsg?.stickerMessage
-  const mediaType = quotedMsg?.imageMessage ? 'imageMessage' : quotedMsg?.stickerMessage ? 'stickerMessage' : null
+  const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage
+  let mediaContent, mediaType
+  if (quoted?.imageMessage) { mediaContent = quoted.imageMessage; mediaType = 'image' }
+  else if (quoted?.stickerMessage) { mediaContent = quoted.stickerMessage; mediaType = 'sticker' }
 
-  if (!mediaContent || !mediaType) {
+  if (!mediaContent) {
     return conn.sendMessage(chat, { text: '⚠️ Responde a una imagen o sticker con .globo' }, { quoted: m })
   }
 
   await conn.sendMessage(chat, { text: '⏳ Procesando...' }, { quoted: m })
 
   try {
-    const mediaMessage = {
-      message: { [mediaType]: mediaContent },
-      key: {
-        remoteJid: m.key.remoteJid,
-        fromMe: false,
-        id: contextInfo.stanzaId,
-        participant: contextInfo.participant
-      }
-    }
+    const stream = await downloadContentFromMessage(mediaContent, mediaType)
+    const chunks = []
+    for await (const chunk of stream) chunks.push(chunk)
+    const userBuffer = Buffer.concat(chunks)
 
-    const userBuffer = await downloadMediaMessage(mediaMessage, 'buffer', {})
     const globeBuffer = fs.readFileSync(globeFile)
-
     const gMeta = await sharp(globeBuffer).metadata()
     const gw = gMeta.width, gh = gMeta.height
 
@@ -43,9 +36,7 @@ export default async function handler(conn, m, args, db) {
       alpha[i] = (r < 150 && g < 150 && b < 150) ? 255 : 0
     }
     const globeOutline = await sharp(raw, { raw: { width: gw, height: gh, channels: 3 } })
-      .joinChannel(alpha)
-      .png()
-      .toBuffer()
+      .joinChannel(alpha).png().toBuffer()
 
     const tmp = path.join(process.cwd(), 'temp')
     if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true })
@@ -54,8 +45,7 @@ export default async function handler(conn, m, args, db) {
     await sharp(userBuffer)
       .resize(gw, gh, { fit: 'cover' })
       .composite([{ input: globeOutline, top: 0, left: 0 }])
-      .webp({ quality: 90 })
-      .toFile(outPath)
+      .webp({ quality: 90 }).toFile(outPath)
 
     await conn.sendMessage(chat, { sticker: { url: outPath } }, { quoted: m })
     try { fs.unlinkSync(outPath) } catch {}

@@ -14,22 +14,18 @@ export default async function handler(conn, m, args, db) {
 
   try {
     const oembed = await axios.get(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`, {
-      timeout: 10000,
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' }
     })
     if (!oembed?.data?.title) throw new Error('No se pudo obtener info de la canción')
     const track = `${oembed.data.title} - ${oembed.data.author_name || ''}`
-    await conn.sendMessage(chat, { text: `🎵 *${oembed.data.title}* - *${oembed.data.author_name || ''}*\n⏳ Buscando en YouTube...` }, { quoted: m })
+    await conn.sendMessage(chat, { text: `🎵 *${oembed.data.title}* - *${oembed.data.author_name || ''}*\n⏳ Descargando...` }, { quoted: m })
 
     const tmp = path.join(process.cwd(), 'temp')
     if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true })
     const out = path.join(tmp, `spotify_${Date.now()}.mp3`)
 
-    const cookiesFile = path.join(process.cwd(), 'src', 'youtube_cookies.txt')
-    const cookiesArg = fs.existsSync(cookiesFile) ? `--cookies "${cookiesFile}"` : ''
-
     execSync(
-      `yt-dlp ${cookiesArg} --extractor-retries 5 --default-search ytsearch -x --audio-format mp3 --audio-quality 0 -o "${out}" "${track}"`,
+      `yt-dlp --extractor-retries 5 --ignore-errors --default-search ytsearch -x --audio-format mp3 --audio-quality 0 -o "${out}" "${track}"`,
       { timeout: 120000, stdio: 'pipe' }
     )
 
@@ -37,10 +33,10 @@ export default async function handler(conn, m, args, db) {
       await conn.sendMessage(chat, { audio: { url: out }, mimetype: 'audio/mpeg', ptt: false }, { quoted: m })
       fs.unlinkSync(out)
     } else {
-      throw new Error('Archivo muy pequeño')
+      throw new Error('Archivo muy pequeño o no encontrado en YouTube')
     }
   } catch (e) {
     const msg = e.stderr?.toString() || e.stdout?.toString() || e.message || ''
-    conn.sendMessage(chat, { text: `❌ No pude descargar la canción\n${msg.slice(0, 200)}` }, { quoted: m })
+    conn.sendMessage(chat, { text: `❌ No pude descargar\n${msg.slice(0, 300)}` }, { quoted: m })
   }
 }
