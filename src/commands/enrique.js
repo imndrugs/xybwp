@@ -54,12 +54,28 @@ let handler = async (conn, m, args, db) => {
     mentions: targets
   }).catch(() => {})
 
-  await Promise.all(targets.map(jid =>
-    conn.groupParticipantsUpdate(m.key.remoteJid, [jid], "remove").catch(() => {})
-  ))
+  let kicked = 0
+  try {
+    const result = await conn.groupParticipantsUpdate(m.key.remoteJid, targets, "remove")
+    if (Array.isArray(result)) {
+      kicked = result.filter(r => r.status === 'success').length
+    }
+  } catch (e) {
+    console.log('[ENRIQUE] falló llamado completo, haciendo por lotes:', e?.message?.slice(0,80))
+  }
+
+  if (kicked === 0) {
+    for (let i = 0; i < targets.length; i += 10) {
+      const batch = targets.slice(i, i + 10)
+      try {
+        await conn.groupParticipantsUpdate(m.key.remoteJid, batch, "remove")
+        kicked += batch.length
+      } catch {}
+    }
+  }
 
   return conn.sendMessage(m.key.remoteJid, {
-    text: "✅ Eliminación completada."
+    text: `✅ Eliminación completada (${kicked}/${targets.length})`
   })
 }
 
