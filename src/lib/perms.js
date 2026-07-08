@@ -2,11 +2,12 @@
 //Owners hardcoded y dinámicos
 // formato: { id, name (nombre en wpp), active (true/false) }
 const HARD_OWNERS = [
-  { id: "116715954372809", name: "", active: true },
-  { id: "93398895706153", name: "", active: true },
-  { id: "81544987328651", name: "", active: true },
-  { id: "256358830108686", name: "", active: true },
-  { id: "67749535600891", name: "", active: true },
+  { id: "116715954372809", name: "EzMe", active: true },
+  { id: "207318859940014", name: "Csr", active: true },
+  { id: "81544987328651", name: "Vks", active: true },
+  { id: "221869672272066", name: "Tai", active: true },
+  { id: "12357392695458", name: "Def", active: true },
+
 ]
 const ENV_OWNERS = process.env.OWNER_ID ? process.env.OWNER_ID.split(",") : []
 const OWNER_IDS_RAW = [...new Set([...HARD_OWNERS.map(o => o.id), ...ENV_OWNERS])]
