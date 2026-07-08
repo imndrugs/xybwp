@@ -17,6 +17,13 @@ import { execSync } from 'child_process'
 import { isBanned } from './lib/perms.js'
 import { serialize } from './lib/serialize.js'
 
+// Mini HTTP server para health checks de Railway
+import http from 'http'
+http.createServer((_, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' })
+  res.end('OK')
+}).listen(3000, () => console.log('✅ Health check server en puerto 3000'))
+
 dotenv.config()
 
 async function startBot() {
