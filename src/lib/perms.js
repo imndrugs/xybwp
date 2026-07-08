@@ -7,7 +7,7 @@ const HARD_OWNERS = [
   { id: "81544987328651", name: "Vks", active: true },
   { id: "221869672272066", name: "Tai", active: true },
   { id: "12357392695458", name: "Def", active: true },
-
+  {id :"272439086997556", name: "Homie", active: true},
 ]
 const ENV_OWNERS = process.env.OWNER_ID ? process.env.OWNER_ID.split(",") : []
 const OWNER_IDS_RAW = [...new Set([...HARD_OWNERS.map(o => o.id), ...ENV_OWNERS])]
