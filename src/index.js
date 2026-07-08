@@ -64,21 +64,26 @@ async function startBot() {
 
   conn.ev.on('creds.update', saveCreds)
 
-  conn.ev.on('connection.update', (update) => {
+  conn.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update
 
     if (qr) {
       const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`
+      let shortUrl = url
+      try {
+        const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(5000) })
+        if (res.ok) shortUrl = await res.text()
+      } catch {}
       console.log("")
       console.log("╔══════════════════════════════════════════╗")
       console.log("║   📱 ESCANEA ESTE QR DESDE TU CELULAR   ║")
       console.log("╚══════════════════════════════════════════╝")
       console.log("")
-      console.log("🔗 Abre este link y escanea el código:")
-      console.log(url)
+      console.log("🔗 Link acortado:")
+      console.log(shortUrl)
       console.log("")
-      console.log("📝 O copia este texto en un generador QR:")
-      console.log(qr)
+      console.log("📝 Link directo (mejor opción):")
+      console.log(qr.startsWith('wa.me') ? `https://${qr}` : qr)
       console.log("")
     }
 
