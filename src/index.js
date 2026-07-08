@@ -113,11 +113,10 @@ async function startBot() {
             }
           }
         } catch {}
-        console.log('♻️ Reconectando en 5s...')
-        setTimeout(() => startBot(), 5000)
-      } else {
-        console.log('⏳ Railway reiniciará el contenedor automáticamente')
       }
+
+      console.log('♻️ Reconectando en 5s...')
+      setTimeout(() => startBot(), 5000)
     }
   })
 
