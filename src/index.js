@@ -16,15 +16,12 @@ import { fileURLToPath } from 'url'
 import { execSync } from 'child_process'
 import { isBanned } from './lib/perms.js'
 import { serialize } from './lib/serialize.js'
-
-// Mini HTTP server para health checks de Railway
 import http from 'http'
-http.createServer((_, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end('OK')
-}).listen(3000, () => console.log('✅ Health check server en puerto 3000'))
 
 dotenv.config()
+
+// Health check para Railway
+http.createServer((_, res) => { res.writeHead(200); res.end('OK') }).listen(3000)
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('./sessions')
@@ -44,7 +41,7 @@ async function startBot() {
         for (const f of fs.readdirSync(dir)) {
           try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
         }
-        console.log("🗑️ Sessions eliminadas para QR nuevo")
+        console.log("🗑️ Sessions viejas eliminadas para nuevo QR")
       }
     } catch {}
     global._botStarted = true
@@ -100,9 +97,8 @@ async function startBot() {
       const reason = lastDisconnect?.error?.message || ''
       console.log(`❌ Conexión cerrada (code: ${code}): ${reason}`)
 
-      // Si es logout (no autorizado), limpiar sessions
       if (code === 401) {
-        console.log('🔑 Sesión inválida, esperando nuevo QR...')
+        console.log('🔑 Sesión inválida, limpiando...')
         try {
           const dir = './sessions'
           if (fs.existsSync(dir)) {
@@ -112,7 +108,6 @@ async function startBot() {
           }
         } catch {}
       }
-      // Baileys ya reconecta automáticamente, no llamar startBot() otra vez
     }
   })
 
@@ -136,7 +131,7 @@ async function startBot() {
       const obj = { contacts: global.db.contacts || {} }
       if (global.db.config) obj.config = global.db.config
       if (global.db.data) obj.data = global.db.data
-      fs.writeFile(dataFile, JSON.stringify(obj, null, 2), () => {})
+      fs.writeFileSync(dataFile, JSON.stringify(obj, null, 2))
     } catch {}
   }
   global.saveDB = saveDB
@@ -186,10 +181,8 @@ async function startBot() {
     return jid.split('@')[0].split(':')[0] + '@s.whatsapp.net'
   }
 
-  let _saveTimer = null
   function saveContacts() {
-    if (_saveTimer) return
-    _saveTimer = setTimeout(() => { _saveTimer = null; saveDB() }, 5000)
+    saveDB()
   }
 
   conn.ev.on('contacts.upsert', (contacts) => {
@@ -455,11 +448,15 @@ async function startBot() {
     if (isGroup && global.db.data?.afk?.[sender]) {
       const afkData = global.db.data.afk[sender]
       delete global.db.data.afk[sender]
-      saveDB()
       const elapsed = Math.floor((Date.now() - afkData.since) / 1000)
       const mins = Math.floor(elapsed / 60)
       const secs = elapsed % 60
       const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
+      try {
+        const raw = JSON.parse(fs.readFileSync(dataFile, 'utf8') || '{}')
+        if (raw.data?.afk?.[sender]) delete raw.data.afk[sender]
+        fs.writeFileSync(dataFile, JSON.stringify(raw, null, 2))
+      } catch {}
       await conn.sendMessage(chat, {
         text: `✨ Bienvenido de vuelta!\n\nEstuviste AFK durante ${timeStr}`
       }, { quoted: m })
