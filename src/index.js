@@ -149,6 +149,7 @@ async function startBot() {
   if (!global.db.contacts) global.db.contacts = {}
   if (!conn.contacts) conn.contacts = {}
   if (!global.db.data) global.db.data = {}
+  if (!global.db.data.admins) global.db.data.admins = []
   if (!global.db.data.muted) global.db.data.muted = []
   if (!global.db.data.banned) global.db.data.banned = []
   if (!global.db.data.antivirgenes) global.db.data.antivirgenes = []

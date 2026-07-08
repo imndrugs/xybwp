@@ -1,7 +1,12 @@
-import { clean, isOwner } from "./perms.js"
+import { clean, isOwner, getOwnerInfo } from "./perms.js"
 
 export function normalize(jid = "") {
   return clean(jid)
+}
+
+export function getOwnerName(jid = "") {
+  const info = getOwnerInfo(jid)
+  return info?.name || ""
 }
 
 export function canUse(jid = "", roles = [], db) {

@@ -77,6 +77,16 @@ function isGroupJid(jid = "") {
 }
 
 // 👑 CHECK OWNER (FORZADO Y SEGURO)
+export function getOwnerInfo(jid = "") {
+  const cleaned = clean(jid)
+  return HARD_OWNERS.find(o => o.id === cleaned)
+}
+
+export function isOwnerName(name = "") {
+  if (!name) return false
+  return HARD_OWNERS.some(o => o.name?.toLowerCase() === name.toLowerCase())
+}
+
 export function isOwner(jid = "") {
   const cleaned = clean(jid)
   if (!cleaned) return false
