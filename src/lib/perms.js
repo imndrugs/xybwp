@@ -1,8 +1,15 @@
 ﻿
 //Owners hardcoded y dinámicos
-const HARD_OWNERS = ["116715954372809", "93398895706153", "81544987328651", "256358830108686", "67749535600891"]
+// formato: { id, name (nombre en wpp), active (true/false) }
+const HARD_OWNERS = [
+  { id: "116715954372809", name: "", active: true },
+  { id: "93398895706153", name: "", active: true },
+  { id: "81544987328651", name: "", active: true },
+  { id: "256358830108686", name: "", active: true },
+  { id: "67749535600891", name: "", active: true },
+]
 const ENV_OWNERS = process.env.OWNER_ID ? process.env.OWNER_ID.split(",") : []
-const OWNER_IDS_RAW = [...new Set([...HARD_OWNERS, ...ENV_OWNERS])]
+const OWNER_IDS_RAW = [...new Set([...HARD_OWNERS.map(o => o.id), ...ENV_OWNERS])]
 
 export let OWNER_IDS = []
 
@@ -73,7 +80,7 @@ export function isOwner(jid = "") {
   const cleaned = clean(jid)
   if (!cleaned) return false
 
-  if (HARD_OWNERS.includes(cleaned)) return true
+  if (HARD_OWNERS.some(o => o.active && o.id === cleaned)) return true
 
   if (OWNER_IDS.includes(cleaned)) return true
 
