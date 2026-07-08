@@ -29,16 +29,19 @@ async function startBot() {
     logger: P({ level: 'silent' })
   })
 
-  // Borrar sessions viejas siempre al iniciar (para forzar QR nuevo)
-  try {
-    const dir = './sessions'
-    if (fs.existsSync(dir)) {
-      for (const f of fs.readdirSync(dir)) {
-        try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
+  // Solo borrar sessions en el primer arranque, NO en reconexiones
+  if (!global._botStarted) {
+    try {
+      const dir = './sessions'
+      if (fs.existsSync(dir)) {
+        for (const f of fs.readdirSync(dir)) {
+          try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
+        }
+        console.log("🗑️ Sessions eliminadas para QR nuevo")
       }
-      console.log("🗑️ Sessions viejas eliminadas para nuevo QR")
-    }
-  } catch {}
+    } catch {}
+    global._botStarted = true
+  }
 
   global._startTime = Date.now()
 
@@ -90,8 +93,19 @@ async function startBot() {
       const reason = lastDisconnect?.error?.message || ''
       console.log(`❌ Conexión cerrada (code: ${code}): ${reason}`)
 
-      console.log('♻️ Reconectando en 3s...')
-      setTimeout(() => startBot(), 3000)
+      // Si es logout (no autorizado), limpiar sessions
+      if (code === 401) {
+        console.log('🔑 Sesión inválida, esperando nuevo QR...')
+        try {
+          const dir = './sessions'
+          if (fs.existsSync(dir)) {
+            for (const f of fs.readdirSync(dir)) {
+              try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
+            }
+          }
+        } catch {}
+      }
+      // Baileys ya reconecta automáticamente, no llamar startBot() otra vez
     }
   })
 
