@@ -67,7 +67,8 @@ async function startBot() {
   conn.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update
 
-    if (qr) {
+    if (qr && !global._qrPrinted) {
+      global._qrPrinted = true
       const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`
       let shortUrl = url
       try {
@@ -79,10 +80,10 @@ async function startBot() {
       console.log("║   📱 ESCANEA ESTE QR DESDE TU CELULAR   ║")
       console.log("╚══════════════════════════════════════════╝")
       console.log("")
-      console.log("🔗 Link acortado:")
+      console.log("🔗 Link acortado (abre en tu celular):")
       console.log(shortUrl)
       console.log("")
-      console.log("📝 Link directo (mejor opción):")
+      console.log("📝 Link directo:")
       console.log(qr.startsWith('wa.me') ? `https://${qr}` : qr)
       console.log("")
     }
@@ -112,10 +113,11 @@ async function startBot() {
             }
           }
         } catch {}
+        console.log('♻️ Reconectando en 5s...')
+        setTimeout(() => startBot(), 5000)
+      } else {
+        console.log('⏳ Railway reiniciará el contenedor automáticamente')
       }
-
-      console.log('♻️ Reconectando en 5s...')
-      setTimeout(() => startBot(), 5000)
     }
   })
 
