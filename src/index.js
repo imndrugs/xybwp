@@ -24,16 +24,7 @@ dotenv.config()
 http.createServer((_, res) => { res.writeHead(200); res.end('OK') }).listen(3000)
 
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState('./sessions')
-  const { version } = await fetchLatestBaileysVersion()
-
-  const conn = makeWASocket({
-    version,
-    auth: state,
-    logger: P({ level: 'silent' })
-  })
-
-  // Solo borrar sessions en el primer arranque, NO en reconexiones
+  // Borrar sessions al arrancar (fuerza QR nuevo)
   if (!global._botStarted) {
     try {
       const dir = './sessions'
@@ -46,6 +37,15 @@ async function startBot() {
     } catch {}
     global._botStarted = true
   }
+
+  const { state, saveCreds } = await useMultiFileAuthState('./sessions')
+  const { version } = await fetchLatestBaileysVersion()
+
+  const conn = makeWASocket({
+    version,
+    auth: state,
+    logger: P({ level: 'silent' })
+  })
 
   global._startTime = Date.now()
 
