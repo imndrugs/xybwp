@@ -116,6 +116,7 @@ async function startBot() {
       }
 
       console.log('♻️ Reconectando en 5s...')
+      global._qrPrinted = false
       setTimeout(() => startBot(), 5000)
     }
   })
