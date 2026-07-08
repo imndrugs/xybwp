@@ -136,7 +136,7 @@ async function startBot() {
       const obj = { contacts: global.db.contacts || {} }
       if (global.db.config) obj.config = global.db.config
       if (global.db.data) obj.data = global.db.data
-      fs.writeFileSync(dataFile, JSON.stringify(obj, null, 2))
+      fs.writeFile(dataFile, JSON.stringify(obj, null, 2), () => {})
     } catch {}
   }
   global.saveDB = saveDB
@@ -186,8 +186,10 @@ async function startBot() {
     return jid.split('@')[0].split(':')[0] + '@s.whatsapp.net'
   }
 
+  let _saveTimer = null
   function saveContacts() {
-    saveDB()
+    if (_saveTimer) return
+    _saveTimer = setTimeout(() => { _saveTimer = null; saveDB() }, 5000)
   }
 
   conn.ev.on('contacts.upsert', (contacts) => {
@@ -453,15 +455,11 @@ async function startBot() {
     if (isGroup && global.db.data?.afk?.[sender]) {
       const afkData = global.db.data.afk[sender]
       delete global.db.data.afk[sender]
+      saveDB()
       const elapsed = Math.floor((Date.now() - afkData.since) / 1000)
       const mins = Math.floor(elapsed / 60)
       const secs = elapsed % 60
       const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
-      try {
-        const raw = JSON.parse(fs.readFileSync(dataFile, 'utf8') || '{}')
-        if (raw.data?.afk?.[sender]) delete raw.data.afk[sender]
-        fs.writeFileSync(dataFile, JSON.stringify(raw, null, 2))
-      } catch {}
       await conn.sendMessage(chat, {
         text: `✨ Bienvenido de vuelta!\n\nEstuviste AFK durante ${timeStr}`
       }, { quoted: m })
