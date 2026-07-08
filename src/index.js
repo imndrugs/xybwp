@@ -24,20 +24,6 @@ dotenv.config()
 http.createServer((_, res) => { res.writeHead(200); res.end('OK') }).listen(3000)
 
 async function startBot() {
-  // Borrar sessions al arrancar (fuerza QR nuevo)
-  if (!global._botStarted) {
-    try {
-      const dir = './sessions'
-      if (fs.existsSync(dir)) {
-        for (const f of fs.readdirSync(dir)) {
-          try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }) } catch {}
-        }
-        console.log("🗑️ Sessions viejas eliminadas para nuevo QR")
-      }
-    } catch {}
-    global._botStarted = true
-  }
-
   const { state, saveCreds } = await useMultiFileAuthState('./sessions')
   const { version } = await fetchLatestBaileysVersion()
 
