@@ -1,8 +1,4 @@
 import fetch from 'node-fetch'
-import { execSync } from 'child_process'
-import { tmpdir } from 'os'
-import { writeFileSync, unlinkSync, readFileSync } from 'fs'
-import { join } from 'path'
 
 const actionTexts = ['le ha dado por el culo a', 'ha penetrado a', 'le ha metido la verga a']
 
@@ -11,30 +7,6 @@ const endpoints = ['https://nekobot.xyz/api/image?type=anal']
 function normalize(jid) {
   if (!jid) return ''
   return jid.split('@')[0].split(':')[0] + '@s.whatsapp.net'
-}
-
-async function gifToMp4(url) {
-  const res = await fetch(url)
-  const buf = Buffer.from(await res.arrayBuffer())
-  const tmpGif = join(tmpdir(), `${Date.now()}.gif`)
-  const tmpMp4 = join(tmpdir(), `${Date.now()}.mp4`)
-  try {
-    writeFileSync(tmpGif, buf)
-    execSync(`ffmpeg -i "${tmpGif}" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -f mp4 "${tmpMp4}" -y`, { timeout: 15000 })
-    return readFileSync(tmpMp4)
-  } finally {
-    try { unlinkSync(tmpGif) } catch {}
-    try { unlinkSync(tmpMp4) } catch {}
-  }
-}
-
-async function sendMedia(conn, jid, url, caption, quoted) {
-  if (url.match(/\.gif($|\?)/i)) {
-    const mp4 = await gifToMp4(url)
-    await conn.sendMessage(jid, { video: mp4, gifPlayback: true, caption }, { quoted })
-  } else {
-    await conn.sendMessage(jid, { image: { url }, caption }, { quoted })
-  }
 }
 
 export default async function handler(conn, m, args, db) {
@@ -55,7 +27,7 @@ export default async function handler(conn, m, args, db) {
       const json = await res.json()
       const url = json.link || json.url || json.message
       if (!url) continue
-      await sendMedia(conn, jid, url, `🔞 ${sName} ${action} ${tName}`, m)
+      await conn.sendMessage(jid, { image: { url }, caption: `🔞 ${sName} ${action} ${tName}` }, { quoted: m })
       return
     } catch {}
   }

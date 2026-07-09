@@ -1,4 +1,4 @@
-import fetch from 'node-fetch'
+import { sendAnimeGif } from '../lib/gif.js'
 
 const actionTexts = [
   'ha besado a',
@@ -44,7 +44,6 @@ export default async function handler(conn, m, args, db) {
     if (metadata) {
       for (const p of metadata.participants) {
         const key = normalize(p.id)
-        console.log('PARTICIPANT:', JSON.stringify({ id: p.id, key, notify: p.notify, pushName: p.pushName, name: p.name, admin: p.admin, verifiedName: p.verifiedName }))
         const name = p.notify || p.pushName || p.name || p.verifiedName || key.split('@')[0]
         if (name) {
           conn.contacts[key] = { id: key, notify: name, name: name }
@@ -54,33 +53,12 @@ export default async function handler(conn, m, args, db) {
     }
   }
 
-  console.log('TARGET:', { raw: targetRaw, normalized: target })
-  console.log('SENDER:', { jid: senderJid, pushName: m.pushName })
-  console.log('CONTACTS:', { inConn: !!conn.contacts?.[target], inDb: !!db.contacts?.[target], connKeys: Object.keys(conn.contacts || {}).slice(0, 5) })
-
   const senderName = getName(conn, db, senderJid) || senderJid.split('@')[0] || 'Alguien'
   const targetName = getName(conn, db, target) || target.split('@')[0]
-
   const action = actionTexts[Math.floor(Math.random() * actionTexts.length)]
 
   try {
-    const res = await fetch('https://g.tenor.com/v1/search?q=anime+kiss&key=LIVDSRZULELA&limit=20')
-    const json = await res.json()
-
-    if (!json.results?.length) throw new Error('Sin resultados')
-
-    const gifs = json.results.filter(r => r.media?.[0]?.mp4?.url)
-    if (!gifs.length) throw new Error('Sin resultados')
-
-    const random = gifs[Math.floor(Math.random() * gifs.length)]
-    const mp4Url = random.media[0].mp4.url
-
-    await conn.sendMessage(jid, {
-      video: { url: mp4Url },
-      gifPlayback: true,
-      caption: `💋 ${senderName} ${action} ${targetName}`
-    }, { quoted: m })
-
+    await sendAnimeGif(conn, jid, 'kiss', `💋 ${senderName} ${action} ${targetName}`, m)
   } catch (err) {
     console.error('Error en kiss:', err)
     await conn.sendMessage(jid, {

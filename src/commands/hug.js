@@ -1,4 +1,4 @@
-import fetch from 'node-fetch'
+import { sendAnimeGif } from '../lib/gif.js'
 
 const actionTexts = [
   'ha abrazado a',
@@ -50,17 +50,7 @@ export default async function handler(conn, m, args, db) {
   const action = actionTexts[Math.floor(Math.random() * actionTexts.length)]
 
   try {
-    const res = await fetch('https://g.tenor.com/v1/search?q=anime+hug&key=LIVDSRZULELA&limit=20')
-    const json = await res.json()
-    if (!json.results?.length) throw new Error('Sin resultados')
-    const gifs = json.results.filter(r => r.media?.[0]?.mp4?.url)
-    if (!gifs.length) throw new Error('Sin resultados')
-    const random = gifs[Math.floor(Math.random() * gifs.length)]
-    await conn.sendMessage(jid, {
-      video: { url: random.media[0].mp4.url },
-      gifPlayback: true,
-      caption: `🤗 ${senderName} ${action} ${targetName}`
-    }, { quoted: m })
+    await sendAnimeGif(conn, jid, 'hug', `🤗 ${senderName} ${action} ${targetName}`, m)
   } catch (err) {
     console.error('Error en hug:', err)
     await conn.sendMessage(jid, { text: '❌ No pude obtener el GIF.' }, { quoted: m })

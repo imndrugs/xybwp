@@ -1,4 +1,4 @@
-import fetch from 'node-fetch'
+import { fetchGifUrl, gifToMp4 } from '../lib/gif.js'
 
 function normalize(jid) {
   if (!jid) return ''
@@ -72,39 +72,21 @@ export default async function handler(conn, m, args, db) {
     percent >= 30 ? '💔 Tal vez solo amigos...' :
     '💀 No hay chance.'
 
+  const caption = [
+    `💕 *SHIP - ${shipName}*`,
+    ``,
+    `👤 ${name1}`,
+    `👤 ${name2}`,
+    ``,
+    `${bar}  **${percent}%**`,
+    `${texts}`
+  ].join('\n')
+
   try {
-    const res = await fetch('https://g.tenor.com/v1/search?q=anime+love+kiss&key=LIVDSRZULELA&limit=30')
-    const json = await res.json()
-    const gifs = json.results?.filter(r => r.media?.[0]?.mp4?.url) || []
-    const gif = gifs[Math.floor(Math.random() * gifs.length)]
-    const mp4Url = gif?.media?.[0]?.mp4?.url
-
-    const caption = [
-      `💕 *SHIP - ${shipName}*`,
-      ``,
-      `👤 ${name1}`,
-      `👤 ${name2}`,
-      ``,
-      `${bar}  **${percent}%**`,
-      `${texts}`
-    ].join('\n')
-
-    if (mp4Url) {
-      await conn.sendMessage(jid, { video: { url: mp4Url }, gifPlayback: true, caption }, { quoted: m })
-    } else {
-      await conn.sendMessage(jid, { text: caption }, { quoted: m })
-    }
+    const gifUrl = await fetchGifUrl('kiss')
+    const mp4 = await gifToMp4(gifUrl)
+    await conn.sendMessage(jid, { video: mp4, gifPlayback: true, caption }, { quoted: m })
   } catch {
-    await conn.sendMessage(jid, {
-      text: [
-        `💕 *SHIP - ${shipName}*`,
-        ``,
-        `👤 ${name1}`,
-        `👤 ${name2}`,
-        ``,
-        `${bar}  **${percent}%**`,
-        `${texts}`
-      ].join('\n')
-    }, { quoted: m })
+    await conn.sendMessage(jid, { text: caption }, { quoted: m })
   }
 }

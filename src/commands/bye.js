@@ -1,4 +1,4 @@
-import fetch from 'node-fetch'
+import { sendAnimeGif } from '../lib/gif.js'
 
 function normalize(jid) {
   if (!jid) return ''
@@ -24,19 +24,7 @@ export default async function handler(conn, m, args, db) {
   const senderName = getName(conn, db, senderJid) || senderJid.split('@')[0] || 'Alguien'
 
   try {
-    const res = await fetch('https://g.tenor.com/v1/search?q=anime+goodbye&key=LIVDSRZULELA&limit=20')
-    const json = await res.json()
-    if (!json.results?.length) throw new Error('Sin resultados')
-    const gifs = json.results.filter(r => r.media?.[0]?.mp4?.url)
-    if (!gifs.length) throw new Error('Sin resultados')
-    const random = gifs[Math.floor(Math.random() * gifs.length)]
-    const mp4Url = random.media[0].mp4.url
-
-    await conn.sendMessage(jid, {
-      video: { url: mp4Url },
-      gifPlayback: true,
-      caption: `👋 ${senderName} dice adiós`
-    }, { quoted: m })
+    await sendAnimeGif(conn, jid, 'hug', `👋 ${senderName} dice adiós`, m)
   } catch (err) {
     console.error('Error en bye:', err)
     await conn.sendMessage(jid, {
