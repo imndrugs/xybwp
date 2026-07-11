@@ -11,6 +11,8 @@ export async function generateBrat(text) {
   ctx.fillStyle = "#000"
   const FONT = "sans-serif"
 
+  const WRAP_W = SIZE * 1.8
+
   function getLines(size) {
     ctx.font = `${size}px ${FONT}`
     const words = text.split(" ")
@@ -19,7 +21,7 @@ export async function generateBrat(text) {
 
     for (const word of words) {
       const test = line ? line + " " + word : word
-      if (ctx.measureText(test).width > SIZE) {
+      if (ctx.measureText(test).width > WRAP_W) {
         if (line) lines.push(line)
         line = word
       } else {
