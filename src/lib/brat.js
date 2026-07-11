@@ -16,11 +16,10 @@ export async function generateBrat(text) {
     const words = text.split(" ")
     const lines = []
     let line = ""
-    const MAX_WIDTH = 480
 
     for (const word of words) {
       const test = line ? line + " " + word : word
-      if (ctx.measureText(test).width > MAX_WIDTH) {
+      if (ctx.measureText(test).width > SIZE) {
         if (line) lines.push(line)
         line = word
       } else {
@@ -32,20 +31,25 @@ export async function generateBrat(text) {
     return lines
   }
 
-  let best = { fontSize: 20, lines: getLines(20), score: -Infinity }
+  let best = { fontSize: 12, lines: getLines(12) }
 
-  for (let size = 200; size >= 20; size -= 2) {
+  for (let size = 500; size >= 12; size -= 2) {
     const lines = getLines(size)
     const totalHeight = lines.length * size * 1.05
 
     if (totalHeight > SIZE) continue
 
-    const coverage = totalHeight / SIZE
-    const score = size * coverage
-
-    if (score > best.score) {
-      best = { fontSize: size, lines, score, totalHeight }
+    let fits = true
+    for (const line of lines) {
+      if (ctx.measureText(line).width > SIZE) {
+        fits = false
+        break
+      }
     }
+    if (!fits) continue
+
+    best = { fontSize: size, lines }
+    break
   }
 
   const { fontSize, lines } = best
