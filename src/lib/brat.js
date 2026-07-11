@@ -33,20 +33,11 @@ export async function generateBrat(text) {
 
   let best = { fontSize: 12, lines: getLines(12) }
 
-  for (let size = 500; size >= 12; size -= 2) {
+  for (let size = 600; size >= 12; size -= 2) {
     const lines = getLines(size)
     const totalHeight = lines.length * size * 1.05
 
     if (totalHeight > SIZE) continue
-
-    let fits = true
-    for (const line of lines) {
-      if (ctx.measureText(line).width > SIZE) {
-        fits = false
-        break
-      }
-    }
-    if (!fits) continue
 
     best = { fontSize: size, lines }
     break
