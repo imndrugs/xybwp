@@ -9,7 +9,7 @@ export async function generateBrat(text) {
   ctx.fillRect(0, 0, SIZE, SIZE)
 
   ctx.fillStyle = "#000"
-  const FONT = "sans-serif"
+  const FONT = "Arial"
   const words = text.split(" ")
   const isSingleWord = words.length === 1
 
@@ -57,7 +57,7 @@ export async function generateBrat(text) {
   const { fontSize, lines } = best
   const lineHeight = fontSize * 1.05
   const totalHeight = lines.length * lineHeight
-  const startY = (SIZE - totalHeight) / 2 + lineHeight / 2
+  const startY = lineHeight / 2 + 10
 
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
