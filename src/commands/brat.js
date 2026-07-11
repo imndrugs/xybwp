@@ -32,13 +32,13 @@ export default async function handler(conn, m, args, db) {
     const lines = wrapText(text, 10)
 
     const lineHeight = 100
-    const svgWidth = 500
+    const svgWidth = 520
     const svgHeight = lines.length * lineHeight
 
     const svgText = lines
       .map((line, index) => {
         const yPos = (index * lineHeight) + 85
-        return `<text x="15" y="${yPos}" class="text" textLength="470" lengthAdjust="spacingAndGlyphs">${line}</text>`
+        return `<text x="40" y="${yPos}" class="text" textLength="440" lengthAdjust="spacingAndGlyphs">${line}</text>`
       })
       .join('')
 
