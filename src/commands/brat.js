@@ -48,7 +48,7 @@ export default async function handler(conn, m, args, db) {
           .text {
             font-family: 'DejaVu Sans', sans-serif;
             font-size: 95px;
-            font-weight: 900;
+            font-weight: bold;
             fill: black;
           }
         </style>
