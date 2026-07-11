@@ -9,17 +9,14 @@ export async function generateBrat(text) {
   ctx.fillRect(0, 0, SIZE, SIZE)
 
   ctx.fillStyle = "#000"
-
   const FONT = "sans-serif"
-
-  let fontSize = 180
 
   function getLines(size) {
     ctx.font = `${size}px ${FONT}`
     const words = text.split(" ")
     const lines = []
     let line = ""
-    const MAX_WIDTH = 430
+    const MAX_WIDTH = 480
 
     for (const word of words) {
       const test = line ? line + " " + word : word
@@ -35,14 +32,22 @@ export async function generateBrat(text) {
     return lines
   }
 
-  while (fontSize > 40) {
-    const lines = getLines(fontSize)
-    const totalHeight = lines.length * fontSize * 1.05
-    if (totalHeight < 420) break
-    fontSize -= 6
+  let best = { fontSize: 40, lines: getLines(40) }
+
+  for (let size = 200; size >= 40; size -= 2) {
+    const lines = getLines(size)
+    const totalHeight = lines.length * size * 1.05 + 20
+
+    if (totalHeight > SIZE) continue
+
+    const score = size - totalHeight * 0.5 + (lines.length === 1 ? 50 : 0) - (lines.length - 1) * 10
+
+    if (score > best.score || !best.score) {
+      best = { fontSize: size, lines, score, totalHeight }
+    }
   }
 
-  const lines = getLines(fontSize)
+  const { fontSize, lines } = best
   const lineHeight = fontSize * 1.05
   const startY = SIZE / 2 - (lines.length * lineHeight) / 2 + lineHeight / 2
 
