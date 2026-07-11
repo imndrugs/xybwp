@@ -34,17 +34,16 @@ export default async function handler(conn, m, args, db) {
     const text = args.join(' ')
     let buffer = await fetchSticker(text)
 
-    const bg = await sharp(buffer)
-      .resize(512, 512, { fit: 'cover' })
-      .blur(40)
-      .png()
-      .toBuffer()
-    const fg = await sharp(buffer)
-      .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .png()
-      .toBuffer()
-    buffer = await sharp(bg)
-      .composite([{ input: fg, top: 0, left: 0 }])
+    const meta = await sharp(buffer).metadata()
+    const cropSize = Math.min(meta.width, meta.height)
+    buffer = await sharp(buffer)
+      .extract({
+        left: Math.floor((meta.width - cropSize) / 2),
+        top: Math.floor((meta.height - cropSize) / 2),
+        width: cropSize,
+        height: cropSize
+      })
+      .resize(512, 512)
       .png()
       .toBuffer()
 
