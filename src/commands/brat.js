@@ -23,7 +23,7 @@ export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
   const sender = getSenderId(m)
 
-  if (!args[0]) {
+  if (!args || args.length === 0) {
     return conn.sendMessage(jid, { text: '✏️ Uso: .brat <texto>\n\nEjemplo: .brat hola' }, { quoted: m })
   }
 
@@ -31,35 +31,37 @@ export default async function handler(conn, m, args, db) {
     const text = args.join(' ')
     const lines = wrapText(text, 10)
 
-    let fontSize = 95
-    if (lines.length === 2) fontSize = 85
-    if (lines.length === 3) fontSize = 70
-    if (lines.length > 3) fontSize = 55
+    const lineHeight = 100
+    const padding = 40
+    const svgWidth = 500
+    const svgHeight = (lines.length * lineHeight) + padding
 
     const svgText = lines
-      .map((line, index) => `<tspan x="20" dy="${index === 0 ? 0 : '1.1em'}">${line}</tspan>`)
+      .map((line, index) => `<tspan x="20" dy="${index === 0 ? 0 : '1em'}">${line}</tspan>`)
       .join('')
 
     const svgBuffer = Buffer.from(`
-      <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+      <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
         <style>
           .text {
             font-family: 'Arial', sans-serif;
-            font-size: ${fontSize}px;
+            font-size: 90px;
             font-weight: bold;
             fill: black;
-            letter-spacing: -2px;
+            letter-spacing: -3px;
           }
         </style>
         <rect width="100%" height="100%" fill="white"/>
-        <text x="20" y="${fontSize + 15}" class="text">
+        <text x="20" y="90" class="text">
           ${svgText}
         </text>
       </svg>
     `)
 
     const buffer = await sharp(svgBuffer)
-      .resize(512, 512)
+      .resize(512, 512, {
+        fit: 'fill'
+      })
       .webp({ quality: 90 })
       .toBuffer()
 
