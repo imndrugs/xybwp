@@ -38,7 +38,7 @@ export default async function handler(conn, m, args, db) {
     const svgText = lines
       .map((line, index) => {
         const yPos = (index * lineHeight) + 85
-        return `<text x="40" y="${yPos}" class="text" textLength="440" lengthAdjust="spacingAndGlyphs">${line}</text>`
+        return `<text x="50" y="${yPos}" class="text" textLength="420" lengthAdjust="spacingAndGlyphs">${line}</text>`
       })
       .join('')
 
@@ -46,9 +46,9 @@ export default async function handler(conn, m, args, db) {
       <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
         <style>
           .text {
-            font-family: 'DejaVu Sans', sans-serif;
+            font-family: 'Arial Narrow', 'Arial', sans-serif;
             font-size: 95px;
-            font-weight: bold;
+            font-weight: 900;
             fill: black;
           }
         </style>
