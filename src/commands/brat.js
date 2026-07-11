@@ -31,25 +31,38 @@ export default async function handler(conn, m, args, db) {
     const text = args.join(' ')
     const lines = wrapText(text, 10)
 
+    let fontSize = 105
+    let lineSpacing = 110
+    if (lines.length === 2) {
+      fontSize = 95
+      lineSpacing = 100
+    } else if (lines.length === 3) {
+      fontSize = 80
+      lineSpacing = 85
+    } else if (lines.length >= 4) {
+      fontSize = 65
+      lineSpacing = 70
+    }
+
     const svgText = lines
-      .map((line, index) => `<tspan x="40" dy="${index === 0 ? 0 : '1.05em'}">${line}</tspan>`)
+      .map((line, index) => {
+        const yPosition = 120 + (index * lineSpacing)
+        return `<text x="26" y="${yPosition}" class="text" textLength="460" lengthAdjust="spacingAndGlyphs">${line}</text>`
+      })
       .join('')
 
     const svgBuffer = Buffer.from(`
-      <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+      <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
         <style>
           .text {
             font-family: 'Arial Narrow', 'Arial', sans-serif;
-            font-size: 140px;
+            font-size: ${fontSize}px;
             font-weight: 900;
             fill: black;
-            letter-spacing: -5px;
           }
         </style>
         <rect width="100%" height="100%" fill="white"/>
-        <text x="40" y="160" class="text">
-          ${svgText}
-        </text>
+        ${svgText}
       </svg>
     `)
 
