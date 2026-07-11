@@ -3,7 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const categories = {
-  '🎮 Interactivos': ['hi', 'hola', 'bye', 'adios', 'love', 'dado', 'ppt', 'encuesta', 'frase'],
+  '🎮 Interactivos': ['love', 'dado', 'ppt', 'encuesta', 'frase'],
   '🔥 NSFW': ['fuck', '69', 'anal', 'boobs', 'blowjob', 'pussy'],
   '🔐 STAFF': [
     'ban', 'unban', 'del', 'enrique',
@@ -39,8 +39,6 @@ const categories = {
 }
 
 const descriptions = {
-  hi: 'GIF anime saludando', hola: 'GIF anime saludando',
-  bye: 'GIF anime despidiendo', adios: 'GIF anime despidiendo',
   love: 'Medir compatibilidad amorosa',
   dado: 'Lanzar un dado 🎲',
   ppt: 'Piedra, papel o tijera',

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import sharp from 'sharp'
 import { makeSticker } from '../lib/sticker.js'
 import { getSenderId } from '../lib/perms.js'
 
@@ -31,7 +32,17 @@ export default async function handler(conn, m, args, db) {
 
   try {
     const text = args.join(' ')
-    const buffer = await fetchSticker(text)
+    let buffer = await fetchSticker(text)
+
+    const { dominant } = await sharp(buffer).stats()
+    buffer = await sharp(buffer)
+      .resize(512, 512, {
+        fit: 'contain',
+        background: { r: dominant.r, g: dominant.g, b: dominant.b, alpha: 1 }
+      })
+      .png()
+      .toBuffer()
+
     const stickerBuffer = await makeSticker(buffer, {
       packname: m.pushName || sender || 'bot',
       author: 'brat'
