@@ -31,48 +31,45 @@ export default async function handler(conn, m, args, db) {
     const text = args.join(' ')
 
     let maxChars = 10
-    if (text.length > 20) maxChars = 14
-    if (text.length > 40) maxChars = 18
+    if (text.length > 20) maxChars = 13
+    if (text.length > 40) maxChars = 16
 
     const lines = wrapText(text, maxChars)
 
-    const longestLineLength = Math.max(...lines.map(l => l.length), 1)
+    const longestLine = Math.max(...lines.map(l => l.length), 1)
 
-    const charWidth = 55
-    const lineHeight = 95
-    const paddingX = 40
-    const paddingY = 40
+    const fontSizeHorizontal = Math.floor(5000 / longestLine)
+    const fontSizeVertical = Math.floor(420 / lines.length)
 
-    const svgWidth = (longestLineLength * charWidth) + paddingX
-    const svgHeight = (lines.length * lineHeight) + paddingY
+    let fontSize = Math.min(fontSizeHorizontal, fontSizeVertical, 95)
+    fontSize = Math.max(fontSize, 35)
+
+    const dyValue = `${(fontSize * 1.05).toFixed(0)}px`
 
     const svgText = lines
-      .map((line, index) => `<tspan x="${paddingX / 2}" dy="${index === 0 ? 0 : '1em'}">${line}</tspan>`)
+      .map((line, index) => `<tspan x="25" dy="${index === 0 ? '0' : dyValue}">${line}</tspan>`)
       .join('')
 
     const svgBuffer = Buffer.from(`
-      <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
+      <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
         <style>
           .text {
             font-family: 'Arial', sans-serif;
-            font-size: 90px;
+            font-size: ${fontSize}px;
             font-weight: bold;
             fill: black;
-            letter-spacing: -3px;
+            letter-spacing: -2px;
           }
         </style>
         <rect width="100%" height="100%" fill="white"/>
-        <text x="${paddingX / 2}" y="${lineHeight}" class="text">
+        <text x="25" y="${fontSize + 25}" class="text">
           ${svgText}
         </text>
       </svg>
     `)
 
     const buffer = await sharp(svgBuffer)
-      .resize(512, 512, {
-        fit: 'contain',
-        background: { r: 255, g: 255, b: 255, alpha: 1 }
-      })
+      .resize(512, 512)
       .webp({ quality: 90 })
       .toBuffer()
 
