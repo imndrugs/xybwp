@@ -46,7 +46,7 @@ export default async function handler(conn, m, args, db) {
       <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
         <style>
           .text {
-            font-family: 'Arial Narrow', 'Arial', sans-serif;
+            font-family: sans-serif;
             font-size: 95px;
             font-weight: 900;
             fill: black;
