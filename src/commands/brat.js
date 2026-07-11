@@ -1,6 +1,23 @@
+import sharp from 'sharp'
 import { makeSticker } from '../lib/sticker.js'
 import { getSenderId } from '../lib/perms.js'
-import { generateBrat } from '../lib/brat.js'
+
+function wrapText(text, maxCharsPerLine = 10) {
+  const words = text.split(' ')
+  let lines = []
+  let currentLine = ''
+
+  words.forEach(word => {
+    if ((currentLine + word).length > maxCharsPerLine) {
+      if (currentLine) lines.push(currentLine.trim())
+      currentLine = word + ' '
+    } else {
+      currentLine += word + ' '
+    }
+  })
+  if (currentLine) lines.push(currentLine.trim())
+  return lines
+}
 
 export default async function handler(conn, m, args, db) {
   const jid = m.chat || m.key?.remoteJid || ''
@@ -12,7 +29,40 @@ export default async function handler(conn, m, args, db) {
 
   try {
     const text = args.join(' ')
-    const buffer = await generateBrat(text)
+    const lines = wrapText(text, 10)
+
+    let fontSize = 95
+    if (lines.length === 2) fontSize = 85
+    if (lines.length === 3) fontSize = 70
+    if (lines.length > 3) fontSize = 55
+
+    const svgText = lines
+      .map((line, index) => `<tspan x="20" dy="${index === 0 ? 0 : '1.1em'}">${line}</tspan>`)
+      .join('')
+
+    const svgBuffer = Buffer.from(`
+      <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+        <style>
+          .text {
+            font-family: 'Arial', sans-serif;
+            font-size: ${fontSize}px;
+            font-weight: bold;
+            fill: black;
+            letter-spacing: -2px;
+          }
+        </style>
+        <rect width="100%" height="100%" fill="white"/>
+        <text x="20" y="${fontSize + 15}" class="text">
+          ${svgText}
+        </text>
+      </svg>
+    `)
+
+    const buffer = await sharp(svgBuffer)
+      .resize(512, 512)
+      .webp({ quality: 90 })
+      .toBuffer()
+
     const stickerBuffer = await makeSticker(buffer, {
       packname: m.pushName || sender || 'bot',
       author: 'brat'
