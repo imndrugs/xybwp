@@ -32,24 +32,26 @@ export async function generateBrat(text) {
     return lines
   }
 
-  let best = { fontSize: 40, lines: getLines(40) }
+  let best = { fontSize: 20, lines: getLines(20), score: -Infinity }
 
-  for (let size = 200; size >= 40; size -= 2) {
+  for (let size = 200; size >= 20; size -= 2) {
     const lines = getLines(size)
-    const totalHeight = lines.length * size * 1.05 + 20
+    const totalHeight = lines.length * size * 1.05
 
     if (totalHeight > SIZE) continue
 
-    const score = size - totalHeight * 0.5 + (lines.length === 1 ? 50 : 0) - (lines.length - 1) * 10
+    const coverage = totalHeight / SIZE
+    const score = size * coverage
 
-    if (score > best.score || !best.score) {
+    if (score > best.score) {
       best = { fontSize: size, lines, score, totalHeight }
     }
   }
 
   const { fontSize, lines } = best
   const lineHeight = fontSize * 1.05
-  const startY = SIZE / 2 - (lines.length * lineHeight) / 2 + lineHeight / 2
+  const totalHeight = lines.length * lineHeight
+  const startY = (SIZE - totalHeight) / 2 + lineHeight / 2
 
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
