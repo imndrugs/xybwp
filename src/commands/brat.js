@@ -32,21 +32,22 @@ export default async function handler(conn, m, args, db) {
     const lines = wrapText(text, 10)
 
     const lineHeight = 100
-    const svgSize = lines.length * lineHeight
+    const svgWidth = 500
+    const svgHeight = lines.length * lineHeight
 
     const svgText = lines
       .map((line, index) => {
-        const yPos = (index * lineHeight) + 82
-        return `<text x="50%" y="${yPos}" text-anchor="middle" class="text">${line}</text>`
+        const yPos = (index * lineHeight) + 85
+        return `<text x="25" y="${yPos}" class="text" textLength="450" lengthAdjust="spacingAndGlyphs">${line}</text>`
       })
       .join('')
 
     const svgBuffer = Buffer.from(`
-      <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 ${svgSize} ${svgSize}" xmlns="http://www.w3.org/2000/svg">
+      <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
         <style>
           .text {
             font-family: 'Arial Narrow', 'Arial', sans-serif;
-            font-size: 92px;
+            font-size: 95px;
             font-weight: 900;
             fill: black;
           }
