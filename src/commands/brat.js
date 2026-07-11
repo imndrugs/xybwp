@@ -34,12 +34,8 @@ export default async function handler(conn, m, args, db) {
     const text = args.join(' ')
     let buffer = await fetchSticker(text)
 
-    const { dominant } = await sharp(buffer).stats()
     buffer = await sharp(buffer)
-      .resize(512, 512, {
-        fit: 'contain',
-        background: { r: dominant.r, g: dominant.g, b: dominant.b, alpha: 1 }
-      })
+      .resize(512, 512, { fit: 'cover', position: 'center' })
       .png()
       .toBuffer()
 
