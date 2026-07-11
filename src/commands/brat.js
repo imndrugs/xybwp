@@ -31,32 +31,23 @@ export default async function handler(conn, m, args, db) {
     const text = args.join(' ')
     const lines = wrapText(text, 10)
 
-    let fontSize = 105
-    let lineSpacing = 110
-    if (lines.length === 2) {
-      fontSize = 95
-      lineSpacing = 100
-    } else if (lines.length === 3) {
-      fontSize = 80
-      lineSpacing = 85
-    } else if (lines.length >= 4) {
-      fontSize = 65
-      lineSpacing = 70
-    }
+    const lineHeight = 100
+    const svgWidth = 500
+    const svgHeight = lines.length * lineHeight
 
     const svgText = lines
       .map((line, index) => {
-        const yPosition = 120 + (index * lineSpacing)
-        return `<text x="26" y="${yPosition}" class="text" textLength="460" lengthAdjust="spacingAndGlyphs">${line}</text>`
+        const yPos = (index * lineHeight) + 85
+        return `<text x="15" y="${yPos}" class="text" textLength="470" lengthAdjust="spacingAndGlyphs">${line}</text>`
       })
       .join('')
 
     const svgBuffer = Buffer.from(`
-      <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+      <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
         <style>
           .text {
             font-family: 'Arial Narrow', 'Arial', sans-serif;
-            font-size: ${fontSize}px;
+            font-size: 95px;
             font-weight: 900;
             fill: black;
           }
@@ -67,7 +58,9 @@ export default async function handler(conn, m, args, db) {
     `)
 
     const buffer = await sharp(svgBuffer)
-      .resize(512, 512)
+      .resize(512, 512, {
+        fit: 'fill'
+      })
       .webp({ quality: 90 })
       .toBuffer()
 
