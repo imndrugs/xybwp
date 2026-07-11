@@ -31,16 +31,41 @@ export async function generateBrat(text) {
     return lines
   }
 
-  let best = { fontSize: 12, lines: getLines(12) }
-
-  for (let size = 600; size >= 12; size -= 2) {
+  function measure(size) {
     const lines = getLines(size)
     const totalHeight = lines.length * size * 1.05
+    let maxLineWidth = 0
+    for (const line of lines) {
+      const w = ctx.measureText(line).width
+      if (w > maxLineWidth) maxLineWidth = w
+    }
+    return { lines, totalHeight, maxLineWidth }
+  }
+
+  const MAX_OVERFLOW = 1.3
+
+  let best = { fontSize: 12, lines: getLines(12), score: -Infinity }
+
+  for (let size = 600; size >= 12; size -= 2) {
+    const { lines, totalHeight, maxLineWidth } = measure(size)
 
     if (totalHeight > SIZE) continue
 
-    best = { fontSize: size, lines }
-    break
+    const widthRatio = maxLineWidth / SIZE
+
+    let score
+    if (widthRatio <= 1) {
+      score = size + (SIZE - totalHeight) * 0.2
+    } else if (widthRatio <= MAX_OVERFLOW) {
+      const penalty = (widthRatio - 1) / (MAX_OVERFLOW - 1)
+      score = size * (1 - penalty * 0.3)
+    } else {
+      continue
+    }
+
+    if (score > best.score) {
+      best = { fontSize: size, lines, score }
+    }
   }
 
   const { fontSize, lines } = best
